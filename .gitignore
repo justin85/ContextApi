@@ -5,3 +5,10 @@
 /reports/*~
 /website/settings.php
 /*.keystore
+/code/ActivityClassifier/.settings
+/code/ActivityClassifier/assets
+/code/ActivityClassifier/bin
+/code/ActivityClassifier/gen
+/code/ActivityClassifier/.classpath
+/code/ActivityClassifier/.project
+/code/ActivityClassifier/default.properties
