@@ -40,4 +40,6 @@ if you want to use the service properly.
     
 
 <string name="activity_stationary">Stationary</string>
+<string name="activity_uncarried_travelling">Uncarried (Travelling)</string>
+<string name="activity_charging_travelling">Charging (Travelling)</string>
 </resources>

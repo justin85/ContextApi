@@ -24,6 +24,8 @@ public class OptionQueries extends Queries {
 	private boolean isWakeLockSet;
 	private float valueOfGravity;
 	private float[] standardDeviation = new float[3];
+	private float[] mean = new float[3];
+	private int count;
 	
 	/**
 	 * @see Queries
@@ -50,6 +52,9 @@ public class OptionQueries extends Queries {
 		int isAccountSent;
 		int isWakeLockSet;
 		float[] standardDeviation = new float[3];
+		float[] mean = new float[3];
+		int count;
+		
 		dbAdapter.open();
 		isServiceRunning = dbAdapter.fetchFromStartTableInt("isServiceRunning");
 		isCalibrated = dbAdapter.fetchFromStartTableInt("isCalibrated");
@@ -59,6 +64,10 @@ public class OptionQueries extends Queries {
 		standardDeviation[0] = dbAdapter.fetchFromStartTableFloat("sdX");
 		standardDeviation[1] = dbAdapter.fetchFromStartTableFloat("sdY");
 		standardDeviation[2] = dbAdapter.fetchFromStartTableFloat("sdZ");
+		mean[0] = dbAdapter.fetchFromStartTableFloat("meanX");
+		mean[1] = dbAdapter.fetchFromStartTableFloat("meanY");
+		mean[2] = dbAdapter.fetchFromStartTableFloat("meanZ");
+		count = dbAdapter.fetchFromStartTableInt("count");
 		dbAdapter.close();
 		
 		if(isServiceRunning==0){
@@ -83,50 +92,26 @@ public class OptionQueries extends Queries {
 		}
 		for(int i = 0; i < 3; i++){
 			this.standardDeviation[i] = standardDeviation[i];
+			this.mean[i] = mean[i];
 		}
+		this.count = count;
 		this.valueOfGravity = valueOfGravity;
 	}
 
 	public synchronized void save(){
-		String isServiceRunning = "";
-		String isCalibrated = "";
-		String isAccountSent = "";
-		String isWakeLockSet = "";
-		String valueOfGravity = "";
-		String[] standardDeviation = new String[3];
-		if(this.isServiceRunning){
-			isServiceRunning = "1";
-		}else{
-			isServiceRunning = "0";
-		}
-		if(this.isCalibrated){
-			isCalibrated = "1";
-		}else{
-			isCalibrated = "0";
-		}
-		if(this.isAccountSent){
-			isAccountSent = "1";
-		}else{
-			isAccountSent = "0";
-		}
-		if(this.isWakeLockSet){
-			isWakeLockSet = "1";
-		}else{
-			isWakeLockSet = "0";
-		}
-		for(int i = 0; i < 3; i++){
-			standardDeviation[i] = this.standardDeviation[i]+"";
-		}
-		valueOfGravity = this.valueOfGravity+"";
 		dbAdapter.open();
-		dbAdapter.updateToSelectedStartTable("isServiceRunning", isServiceRunning);
-		dbAdapter.updateToSelectedStartTable("isCalibrated", isCalibrated);
-		dbAdapter.updateToSelectedStartTable("valueOfGravity", valueOfGravity);
-		dbAdapter.updateToSelectedStartTable("sdX", standardDeviation[0]);
-		dbAdapter.updateToSelectedStartTable("sdY", standardDeviation[1]);
-		dbAdapter.updateToSelectedStartTable("sdZ", standardDeviation[2]);
-		dbAdapter.updateToSelectedStartTable("isAccountSent", isAccountSent);
-		dbAdapter.updateToSelectedStartTable("isWakeLockSet", isWakeLockSet);
+		dbAdapter.updateToSelectedStartTable("isServiceRunning", this.isServiceRunning?"1":"0");
+		dbAdapter.updateToSelectedStartTable("isCalibrated", this.isCalibrated?"1":"0");
+		dbAdapter.updateToSelectedStartTable("isAccountSent", this.isAccountSent?"1":"0");
+		dbAdapter.updateToSelectedStartTable("isWakeLockSet", this.isWakeLockSet?"1":"0");
+		dbAdapter.updateToSelectedStartTable("valueOfGravity", Float.toString(this.valueOfGravity));
+		dbAdapter.updateToSelectedStartTable("sdX", Float.toString(this.standardDeviation[0]));
+		dbAdapter.updateToSelectedStartTable("sdY", Float.toString(this.standardDeviation[1]));
+		dbAdapter.updateToSelectedStartTable("sdZ", Float.toString(this.standardDeviation[2]));
+		dbAdapter.updateToSelectedStartTable("meanX", Float.toString(this.mean[0]));
+		dbAdapter.updateToSelectedStartTable("meanY", Float.toString(this.mean[1]));
+		dbAdapter.updateToSelectedStartTable("meanZ", Float.toString(this.mean[2]));
+		dbAdapter.updateToSelectedStartTable("count", Integer.toString(count));
 		dbAdapter.close();
 	}
 	
@@ -227,6 +212,72 @@ public class OptionQueries extends Queries {
 		return this.standardDeviation[2];
 	}
 
+	/**
+	 * Set the mean of X axis over certain amount of times
+	 * @param value mean of X axis
+	 */
+	public synchronized void setMeanX(float value){
+		this.mean[0] = value;
+	}
+
+	/**
+	 * Get the mean of X axis
+	 * @return float data type of mean of X axis
+	 */
+	public synchronized float getMeanX(){
+		return this.mean[0];
+	}
+
+	/**
+	 * Set the mean of Y axis over certain amount of times
+	 * @param value mean of Y axis
+	 */
+	public synchronized void setMeanY(float value){
+		this.mean[1] = value;
+	}
+
+	/**
+	 * Get the mean of Y axis
+	 * @return float data type of mean of Y axis
+	 */
+	public synchronized float getMeanY(){
+		return this.mean[1];
+	}
+	
+	/**
+	 * Set the mean of Z axis over certain amount of times
+	 * @param value mean of Z axis
+	 */
+	public synchronized void setMeanZ(float value){
+		this.mean[2] = value;
+	}
+
+	/**
+	 * Get the mean of Z axis
+	 * @return float data type of mean of Z axis
+	 */
+	public synchronized float getMeanZ(){
+		return this.mean[2];
+	}
+
+	/**
+	 * Set the number of windows used to compute the mean and standard deviation
+	 * @param value
+	 * the number of windows used to compute the mean and standard deviation
+	 */
+	public synchronized void setCount(int value){
+		this.count = value;
+	}
+
+	/**
+	 * Get the number of samples used to compute the mean and standard deviation
+	 * @return float
+	 * the number of windows used to compute the mean and standard deviation
+	 */
+	public synchronized int getCount(){
+		return this.count;
+	}
+	
 	/**
 	 * Set the posting account state 
 	 * @param value should be 1 if account details is posted, 0 otherwise

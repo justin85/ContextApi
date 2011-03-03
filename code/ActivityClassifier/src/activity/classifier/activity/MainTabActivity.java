@@ -378,7 +378,6 @@ public class MainTabActivity extends TabActivity {
 							EnableDeletion = false;
 						}
 					} catch (RemoteException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 				}

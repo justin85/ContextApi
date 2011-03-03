@@ -22,7 +22,6 @@
 
 package activity.classifier.accel;
 
-import activity.classifier.Calibration;
 import activity.classifier.common.Constants;
 import activity.classifier.rpc.Classification;
 import android.os.Handler;
@@ -61,6 +60,7 @@ public class SimpleSampler implements Runnable, Sampler {
     public void start(SampleBatch currentBatch) {
     	this.currentBatch = currentBatch;
     	this.currentBatch.reset();
+    	this.currentBatch.sampleTime = System.currentTimeMillis();
     	
         reader.startSampling();
         this.sampling = true;
@@ -96,7 +96,7 @@ public class SimpleSampler implements Runnable, Sampler {
     		maxTimeDelay = currTimeDelay;
     	*/
     	reader.assignSample(currentBatch.getCurrentSample());
-    	Log.i("accel",currentBatch.getCurrentSample()[0]+" "+currentBatch.getCurrentSample()[1]+" "+currentBatch.getCurrentSample()[2]);
+    	//Log.i("accel",currentBatch.getCurrentSample()[0]+" "+currentBatch.getCurrentSample()[1]+" "+currentBatch.getCurrentSample()[2]);
     	if (!currentBatch.nextSample()) {
     		/*
     		Log.v(Constants.DEBUG_TAG, "Cummulative Absolute Sampling Time Error: "+cummTimeError);

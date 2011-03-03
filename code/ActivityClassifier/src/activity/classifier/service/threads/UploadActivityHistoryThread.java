@@ -176,7 +176,6 @@ public class UploadActivityHistoryThread extends Thread {
 						message +=  itemNames.get(i)+"&&"+itemStartDates.get(i)+"&&"+df1.format(tempdate)+"##";
 					}
 				} catch (ParseException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 

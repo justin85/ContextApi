@@ -33,6 +33,7 @@ import activity.classifier.accel.AccelReaderFactory;
 import activity.classifier.accel.SampleBatch;
 import activity.classifier.accel.SampleBatchBuffer;
 import activity.classifier.accel.Sampler;
+import activity.classifier.activity.ActivityListActivity;
 import activity.classifier.activity.MainTabActivity;
 import activity.classifier.accel.SimpleSampler;
 import activity.classifier.aggregator.Aggregator;
@@ -98,8 +99,6 @@ public class RecorderService extends Service implements Runnable {
 
 	private PowerManager.WakeLock PARTIAL_WAKE_LOCK_MANAGER;
 	private PowerManager.WakeLock SCREEN_DIM_WAKE_LOCK_MANAGER;
-
-	private float[] ignore = { 0 };
 
 	private UploadActivityHistoryThread uploadActivityHistory;
 
@@ -237,7 +236,7 @@ public class RecorderService extends Service implements Runnable {
 		}
 		
 		public void submitClassification(String classification) throws RemoteException {
-			Log.i(getClass().getName(), "Received classification: " + classification);
+			Log.i(Constants.DEBUG_TAG, "Recorder Service: Received classification: '" + classification + "'");
 			updateScores(classification);
 		}
 
@@ -288,7 +287,7 @@ public class RecorderService extends Service implements Runnable {
 					//	please note that this function blocks until an empty batch is found
 					//	which is why it is important to start with a sufficient number of batches
 					//	and process the batches as fast as possible
-					SampleBatch batch = batchBuffer.takeEmptyBatch();
+					SampleBatch batch = batchBuffer.takeEmptyInstance();
 					sampler.start(batch);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
@@ -310,21 +309,12 @@ public class RecorderService extends Service implements Runnable {
 			//	get the sample batch from the sampler
 			SampleBatch sample = sampler.getSampleBatch();
 			
-			if (ignore[0] <= 1) {
-				ignore[0]++;
-			}
-			
 			//	set any required properties
 			sample.setCharging(charging);
-			sample.setIgnore(ignore);
-			sample.setLastClassificationName(
-					(!classifications.isEmpty()) ?
-							classifications.get(classifications.size() - 1).getNiceClassification()
-							: null );
 			
 			//	put it back into the buffer as a filled batch
 			try {
-				batchBuffer.returnFilledBatch(sample);
+				batchBuffer.returnFilledInstance(sample);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -341,8 +331,15 @@ public class RecorderService extends Service implements Runnable {
 	 */
 	private void insertNewActivity() throws ParseException {
 		try {
-			String activity = classifications.get(classifications.size()-1).withContext(this).getNiceClassification();
-			String startDate  = classifications.get(classifications.size()-1).getStartTime();
+			Classification c = classifications.get(classifications.size()-1);
+			if (c==null)
+				return;
+			c = c.withContext(this);
+			if (c==null)
+				return;
+			
+			String activity = c.getNiceClassification();
+			String startDate  = c.getStartTime();
 
 			if(activity!=null && !lastAc.equals(activity)){
 				Log.i("classification",activity);
@@ -365,11 +362,12 @@ public class RecorderService extends Service implements Runnable {
 		
 	}
 	
-	private void updateScores(final String classification) {
-		aggregator.addClassification(classification);
-		if (!aggregator.getClassification().equals("CLASSIFIED/WAITING")) {
-			final String best = aggregator.getClassification();
-			String[] cl = classification.split("/");
+	private void updateScores(final String newClassification) {
+		
+		aggregator.addClassification(newClassification);
+		String aggrClassification = aggregator.getClassification();
+		if (aggrClassification!=null && !aggrClassification.equals("CLASSIFIED/WAITING")) {
+			final String best = aggrClassification;
 			
 			if (!classifications.isEmpty()
 					&& best.equals(classifications.get(classifications.size() - 1).getClassification())) {
@@ -377,12 +375,14 @@ public class RecorderService extends Service implements Runnable {
 			} else {
 				classifications.add(new Classification(best, System.currentTimeMillis()));
 			}
-			// }
 		}
+		
+//		final String best = newClassification;
+//		classifications.add(new Classification(best, System.currentTimeMillis()));
+		
 		try {
 			insertNewActivity();
 		} catch (ParseException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -422,6 +422,8 @@ public class RecorderService extends Service implements Runnable {
 	public void onDestroy() {
 		super.onDestroy();
 		
+		Log.v(Constants.DEBUG_TAG, "RecorderService.onDestroy()");
+		
 		if (running) {
 			running = false;
 			
@@ -436,8 +438,6 @@ public class RecorderService extends Service implements Runnable {
 	}
 
 	public void run() {		
-		Log.v(Constants.DEBUG_TAG, "Recorder Service Started!!");
-		
 		//	create a looper for this thread
 		Looper.prepare();
 		
@@ -523,7 +523,7 @@ public class RecorderService extends Service implements Runnable {
 		uploadActivityHistory = new UploadActivityHistoryThread(this, activityQuery, phoneInfo);		
 		uploadActivityHistory.startUploads();
 		
-		handler.postDelayed(registerRunnable, 1000);
+		handler.postDelayed(registerRunnable, Constants.DELAY_SAMPLE_BATCH);
 
 		// classifications.add(new Classification("CLASSIFIED/WAITING",
 		// System.currentTimeMillis()));
@@ -551,12 +551,11 @@ public class RecorderService extends Service implements Runnable {
 		}
 		
 		Date date = new Date(System.currentTimeMillis());
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z");
-		String startTime = dateFormat.format(date);
+		String startTime = Constants.DB_DATE_FORMAT.format(date);
+		
 		// save message "END" to recognise when the background service is
 		// finished.
 		activityQuery.insertActivities("END", startTime, 0);
-		ignore[0] = 0;
 		optionQuery.setServiceRunningState(false);
 		optionQuery.save();
 		MainTabActivity.serviceIsRunning = false;

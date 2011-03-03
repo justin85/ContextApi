@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-package activity.classifier.common;
+package activity.classifier.geo;
 
 import android.os.Build;
 

@@ -23,6 +23,7 @@
 package activity.classifier.common;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -42,6 +43,7 @@ import org.apache.http.protocol.HTTP;
 import android.content.Context;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.telephony.TelephonyManager;
+import android.util.Log;
 
 /**
  * An exception handler which reports any uncaught exceptions to the context
@@ -106,13 +108,33 @@ public class ExceptionHandler implements UncaughtExceptionHandler {
 
         defaultUEH.uncaughtException(t, e);
     }
+    
     private void writeToFile(String stacktrace, String filename) {
         try {
-            BufferedWriter bos = new BufferedWriter(new FileWriter(
-                    localPath + "/" + filename));
+        	File outputFile = new File(localPath + File.separator + filename);
+        	if (!outputFile.getParentFile().exists()) {
+        		if (!outputFile.mkdirs()) {
+                    Log.e("Activity Classifier Error", 
+                    		"Unable to create log file directory:\n"+
+                    		outputFile.getParentFile()+
+                    		"\nCaused when writing stack to file:\n"+
+                    		stacktrace);
+        		}
+        	}
+        	if (!outputFile.exists()) {
+        		if (!outputFile.createNewFile()) {
+                    Log.e("Activity Classifier Error", 
+                    		"Unable to create log file:\n"+
+                    		outputFile.getParentFile()+
+                    		"\nCaused when writing stack to file:\n"+
+                    		stacktrace);
+        		}
+        	}
+            BufferedWriter bos = new BufferedWriter(new FileWriter(outputFile));
             bos.write(stacktrace);
             bos.flush();
             bos.close();
+            Log.e("Activity Classifier Error", stacktrace);
         } catch (Exception e) {
             e.printStackTrace();
         }

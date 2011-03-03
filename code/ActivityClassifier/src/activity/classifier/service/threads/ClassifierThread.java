@@ -5,305 +5,255 @@
 
 package activity.classifier.service.threads;
 
-import activity.classifier.Calibration;
-import activity.classifier.R;
 import activity.classifier.accel.SampleBatch;
 import activity.classifier.accel.SampleBatchBuffer;
-import activity.classifier.common.Classifier;
+import activity.classifier.classifier.Classifier;
+import activity.classifier.classifier.KnnClassifier;
 import activity.classifier.common.Constants;
 import activity.classifier.repository.OptionQueries;
 import activity.classifier.repository.TestAVQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.service.RecorderService;
 import activity.classifier.utils.CalcStatistics;
+import activity.classifier.utils.Calibrator;
 import activity.classifier.utils.RotateSamplesToVerticalHorizontal;
-import android.app.Service;
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
-import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
-import android.widget.Toast;
 
 /**
- * ClassifierService class is a Service analyse the sensor data to classify activities.
- * RecorderService class invokes this class when sampling is done, 
- * and send parameters (data collection, size of data array,battery status, etc) which is useful to determine the activities.
- * After done with classification, it notices RecorderService about what activity is classified.
+ * ClassifierService class is a Service analyse the sensor data to classify
+ * activities. RecorderService class invokes this class when sampling is done,
+ * and send parameters (data collection, size of data array,battery status, etc)
+ * which is useful to determine the activities. After done with classification,
+ * it notices RecorderService about what activity is classified.
  * 
  * 
- * Standard Deviation(sd) and Average values for accelerations(average) are used to classify Uncarried state.
- * chargingState(battery status) is used to classify Charging state.
+ * Standard Deviation(sd) and Average values for accelerations(average) are used
+ * to classify Uncarried state. chargingState(battery status) is used to
+ * classify Charging state.
  * 
- * Other activities are classified through KNN algorithm (with K=1).
- * (This KNN classification is implemented in Aggregator.java)
+ * Other activities are classified through KNN algorithm (with K=1). (This KNN
+ * classification is implemented in Aggregator.java)
  * 
- * Local database is used to store some meaningful information such as sd, average, 
- * lastaverage (the average of acceleration values when the activity is Uncarried, if the activity is not a Uncarried, then the values is 0.0).
- *
- *	<p>
- *	Changes made by Umran: <br>
- *	The class used to be called ClassifierService. Now changed to a thread.
- *	Communication between {@link RecorderService} and this class is done through
- *	the {@link SampleBatch} and {@link SampleBatchBuffer}.
- *	<p>
- *	Filled batches are posted into the buffer in {@link RecorderService}
- *	and removed here, after analysis, the batches are posted back into the
- *	buffer as empty batches where the recorder class removes them and fills them
- *	with sampled data. 
- *
+ * Local database is used to store some meaningful information such as sd,
+ * average, lastaverage (the average of acceleration values when the activity is
+ * Uncarried, if the activity is not a Uncarried, then the values is 0.0).
+ * 
+ * <p>
+ * Changes made by Umran: <br>
+ * The class used to be called ClassifierService. Now changed to a thread.
+ * Communication between {@link RecorderService} and this class is done through
+ * the {@link SampleBatch} and {@link SampleBatchBuffer}.
+ * <p>
+ * Filled batches are posted into the buffer in {@link RecorderService} and
+ * removed here, after analysis, the batches are posted back into the buffer as
+ * empty batches where the recorder class removes them and fills them with
+ * sampled data.
+ * 
  * @author chris, modified by Justin Lee
  * 
  * 
  */
 public class ClassifierThread extends Thread {
-
+	
 	private ActivityRecorderBinder service;
 	private SampleBatchBuffer batchBuffer;
-    
-	private String classification;
+	
+	private OptionQueries optionQuery;
+	private TestAVQueries testavQuery;
 
-    /**
-     * variables when classify Uncarried state
-     */
-    private static boolean possiblyUncarried = false;
-    private static boolean keepLastAvgAccel = false;
-    private static float[] lastaverage = {0, 0, 0};
-    private boolean uncarried;
-    
-    private Calibration calibration;
-    private final int CALIBRATION_PERIOD = 5;
-    
-    private float[] ssd = new float[3];
-    float valueOfGravity;
-    private OptionQueries optionQuery;
-    private TestAVQueries testavQuery;
-    
-    private CalcStatistics calcSampleStatistics = new CalcStatistics(3);
-    private RotateSamplesToVerticalHorizontal rotateSamples = new RotateSamplesToVerticalHorizontal();
-    private Classifier classifier;
-    
-    private boolean shouldExit;
+	private CalcStatistics calcSampleStatistics = new CalcStatistics(Constants.ACCEL_DIM);	
+	private RotateSamplesToVerticalHorizontal rotateSamples = new RotateSamplesToVerticalHorizontal();
+	private Classifier classifier;
 
-    public ClassifierThread(Context context, ActivityRecorderBinder service, SampleBatchBuffer sampleBatchBuffer) {
-    	this.service = service;
-    	this.batchBuffer = sampleBatchBuffer;
-    	
-        uncarried =  false;
-        testavQuery = new TestAVQueries(context);
-        
-        this.classifier = new Classifier(RecorderService.model.entrySet());
-        this.optionQuery = new OptionQueries(context);
-        
-        this.shouldExit = false;
-	}
-    
-    /**
-     * Stops the thread cautiously
-     */
-    public synchronized void exit() {
-    	//	signal the thread to exit
-    	this.shouldExit = false;
-    	
-		//	if the thread is blocked waiting for a filled batch
-		//		interrupt the thread
-		this.interrupt();
-    }
-    
-    /**
-     * Classification start
-     */
-    public void run() {
-    	
-    	Log.v(Constants.DEBUG_TAG, "Classification thread started.");
-    	while (!this.shouldExit) {
-	        try {
-	        	//	incase of too sampling too fast, or too slow CPU, or the classification taking too long
-	        	//		check how many batches are pending
-	        	int pendingBatches = batchBuffer.getPendingFilledBatches();
-	        	if (pendingBatches==SampleBatchBuffer.TOTAL_BATCH_COUNT) {
-	        		//	issue an error if too many
-	        		service.showServiceToast("Unable to classify sensor data fast enough!");
-	        	}
-	        	
-	        	// this function blocks until a filled sample batch is obtained
-	        	SampleBatch batch = batchBuffer.takeFilledBatch();
-//	        	Log.v(Constants.DEBUG_TAG, "Received filled batch for analysis.");
-	        	
-	        	//	process the sample batch to obtain the classification
-	        	processData(batch);
-
-//	        	Log.v(Constants.DEBUG_TAG, "Analysis done. Returning batch.");
-	        	//	return the sample batch to the buffer as an empty batch
-	        	batchBuffer.returnEmptyBatch(batch);
-	        	//	submit the classification
-	        	service.submitClassification(classification);
-	        } catch (RemoteException ex) {
-	        	Log.e(Constants.DEBUG_TAG, "Exception error occured in connection in ClassifierService class");
-	        } catch (InterruptedException e) {
-			}
-    	}
-    	Log.v(Constants.DEBUG_TAG, "Classification thread exiting.");
-
-    }
-
-    private void processData(SampleBatch batch) {
-    	//---------------------Classification for Charging-------------------------//
-    	/*
-    	 *  Commented for practical reason, DO NOT delete this part. 
-    	 */
-    	boolean chargingState = batch.isCharging();
-        if(chargingState){
-             Log.i("STATUS", "Charging");
-        	classification="CLASSIFIED/CHARGING";
-        }
-      else{
-    	//---------------------Classification for the rest of activities-------------------------//
-
-    	float[][] data = batch.data;
-    	int size = batch.getSize();
-		String lastClassificationName = batch.getLastClassificationName();
-		float[] ignore = batch.getIgnore();
-		boolean isCalibrated;		
+	private boolean isCalibrated;
+	private Calibrator calibrator;
+	
+	private boolean shouldExit;
+	
+	public ClassifierThread(Context context, ActivityRecorderBinder service,
+			SampleBatchBuffer sampleBatchBuffer) {
+		this.service = service;
+		this.batchBuffer = sampleBatchBuffer;
 		
-    	//	first rotate samples to world-orientation
-    	
-		//	the model data isn't rotated yet...
-    	if (rotateSamples.rotateToWorldCoordinates(data)) {
-	    	
-			isCalibrated = optionQuery.isCalibrated();
-			// read sensor standard deviation from the database
-			this.optionQuery.load();
-			ssd[0] = optionQuery.getStandardDeviationX();
-			ssd[1] = optionQuery.getStandardDeviationY();
-			ssd[2] = optionQuery.getStandardDeviationZ();
-			valueOfGravity = optionQuery.getValueOfGravity();
-			
-			float[] sd = new float[3];
-			float[] average = { 0, 0, 0 };
-			
-			calcSampleStatistics.assign(data, size);
-			
-			average = calcSampleStatistics.getMean();
-			sd = calcSampleStatistics.getStandardDeviation();
-			
-			// Performs calibration when the calibration state is 0 (false)
-			if (!isCalibrated) {
-				calibration = new Calibration();
-				
-				// calibrate only when the previous classification was Uncarried
-				if (lastClassificationName != null
-						&& lastClassificationName.equalsIgnoreCase("uncarried")) {
-					
-					Log.i("Calibration", "Calibration " + (5 - (calibration.getCount() - 1)) + " to go");
-					
-					calibration.doCalibration(average, sd);
-					/*
-					 * if calibration is done over the calibration period with
-					 * Uncarried state in a row, then calculate the standard
-					 * deviation over this period, set it as sensor standard
-					 * deviation, and set the calibration state to 1 (true)
-					 */
-					if (calibration.getCount() == CALIBRATION_PERIOD) {
-						float[] tempSSD = new float[3];
-						tempSSD = calibration.getSSD();
-						for (int i = 0; i < 3; i++) {
-							ssd[i] = tempSSD[i];
-						}
-						valueOfGravity = calibration.getValueOfGravity();
-						Log.i("Calibration", "saved in datastore");
-						optionQuery.setCalibrationState(true);
-						optionQuery.setValueOfGravity(valueOfGravity);
-						optionQuery.setStandardDeviationX(ssd[0]);
-						optionQuery.setStandardDeviationY(ssd[1]);
-						optionQuery.setStandardDeviationZ(ssd[2]);
-						optionQuery.save();
-						calibration.setCount(0);
-					}
-				} else {
-					// when any movement is detected, then calibration is cancelled.
-					Log.i("Calibration", "Canceled");
-					calibration.setCount(0);
+		testavQuery = new TestAVQueries(context);
+
+		this.classifier = new KnnClassifier(RecorderService.model.entrySet());
+		this.optionQuery = new OptionQueries(context);
+		
+		this.optionQuery.load();
+		isCalibrated = this.optionQuery.isCalibrated();
+		if (isCalibrated) {
+			calibrator = new Calibrator(
+					service, 
+					calcSampleStatistics,
+					true,
+					this.optionQuery.getCount(),
+					new float[] {
+						this.optionQuery.getStandardDeviationX(),
+						this.optionQuery.getStandardDeviationY(),
+						this.optionQuery.getStandardDeviationZ(),
+					},
+					new float[] {
+						this.optionQuery.getMeanX(),
+						this.optionQuery.getMeanY(),
+						this.optionQuery.getMeanZ(),
+					},
+					this.optionQuery.getValueOfGravity()
+				);
+		} else {
+			calibrator = new Calibrator(
+					service,
+					calcSampleStatistics,
+					false,
+					0,
+					new float[] {
+						Constants.CALIBARATION_ALLOWED_DEVIATION,
+						Constants.CALIBARATION_ALLOWED_DEVIATION,
+						Constants.CALIBARATION_ALLOWED_DEVIATION
+					},
+					new float[] {
+						0,
+						0,
+						0
+					},
+					Constants.GRAVITY
+				);
+		}
+		
+		this.shouldExit = false;
+	}
+
+	/**
+	 * Stops the thread cautiously
+	 */
+	public synchronized void exit() {
+		// signal the thread to exit
+		this.shouldExit = false;
+
+		// if the thread is blocked waiting for a filled batch
+		// interrupt the thread
+		this.interrupt();
+	}
+
+	/**
+	 * Classification start
+	 */
+	public void run() {
+
+		Log.v(Constants.DEBUG_TAG, "Classification thread started.");
+		while (!this.shouldExit) {
+			try {
+				// in case of too sampling too fast, or too slow CPU, or the
+				// classification taking too long
+				// check how many batches are pending
+				int pendingBatches = batchBuffer.getPendingFilledInstances();
+				if (pendingBatches == SampleBatchBuffer.TOTAL_BATCH_COUNT) {
+					// issue an error if too many
+					service.showServiceToast("Unable to classify sensor data fast enough!");
 				}
-			}
-			
-			Log.i("Calibration", "ssd[0] : " + ssd[0] + ", " + "ssd[1] : " + ssd[1] + ", "
-					+ "ssd[2] : " + ssd[2]);
-			
-			if (sd[0] < 3 * ssd[0] && sd[1] < 3 * ssd[1] && sd[2] < 3 * ssd[2] ) {
+
+				// this function blocks until a filled sample batch is obtained
+				SampleBatch batch = batchBuffer.takeFilledInstance();
 				
-				lastaverage[0] = average[0];
-				lastaverage[1] = average[1];
-				lastaverage[2] = average[2];
-				
-				possiblyUncarried = true;
-				keepLastAvgAccel = true;
-				Log.i("STATUS", "1possibly uncarried  ");
-				
-			} else{
-				possiblyUncarried = false;
-				uncarried = false;
-				keepLastAvgAccel = false;
-			}
-				if (possiblyUncarried) {
-					Log.i("compare", "CompareX : " + (lastaverage[0] - 3 * ssd[0]) + " <= "	+ average[0] + " <= " + (lastaverage[0] + 3 * ssd[0]));
-					Log.i("compare", "CompareY : " + (lastaverage[1] - 3 * ssd[1]) + " <= "	+ average[1] + " <= " + (lastaverage[1] + 3 * ssd[1]));
-					Log.i("compare", "CompareZ : " + (lastaverage[2] - 3 * ssd[2]) + " <= "	+ average[2] + " <= " + (lastaverage[2] + 3 * ssd[2]));
-					if ((lastaverage[0] - 3 * ssd[0] <= average[0] && lastaverage[0] + 3 * ssd[0] >= average[0])
-							&& (lastaverage[1] - 3 * ssd[1] <= average[1] && lastaverage[1] + 3 * ssd[1] >= average[1])
-							&& (lastaverage[2] - 3 * ssd[2] <= average[2] && lastaverage[2] + 3	* ssd[2] >= average[2])) {
-						uncarried = true;
-						
-					} else {
-						keepLastAvgAccel = false;
-						possiblyUncarried = false;
-					}
-					Log.i("STATUS", "2possibly uncarried  ");
-				} else {
-					possiblyUncarried = false;
-					uncarried = false;
-					keepLastAvgAccel = false;
+				Log.v(Constants.DEBUG_TAG, "Classifier thread received batch");
+
+				// process the sample batch to obtain the classification
+				String classification = processData(batch);
+				Log.v(Constants.DEBUG_TAG, "Classification found: '"+classification+"'");
+
+				// return the sample batch to the buffer as an empty batch
+				batchBuffer.returnEmptyInstance(batch);
+				if (classification!=null && classification.length()>0) {
+					// submit the classification
+					service.submitClassification(classification);
 				}
-			
-			testavQuery.insertTestValues(	sd[0] + "", sd[1] + "", sd[2] + "", lastaverage[0] + "",
-											lastaverage[1] + "", lastaverage[2] + "", average[0] + "",
-											average[1] + "", average[2] + "");
-			Log.i("sd", sd[0] + " " + sd[1] + " " + sd[2] + " ");
-			Log.i("last", lastaverage[0] + " " + lastaverage[1] + " " + lastaverage[2] + " ");
-			Log.i("curr", average[0] + " " + average[1] + " " + average[2] + " ");
-			// ---------------------------------------------------------------------
-			// ---------------------Classification for
-			// Uncarried-------------------------//
-			if (uncarried) {
-				uncarried = false;
-				keepLastAvgAccel = true;
-				classification = "CLASSIFIED/UNCARRIED";
+			} catch (RemoteException ex) {
+				Log.e(Constants.DEBUG_TAG,
+						"Exception error occured in connection in ClassifierService class");
+			} catch (InterruptedException e) {
+				Log.e(Constants.DEBUG_TAG,
+						"Exception occured while performing classification", e);
 			}
-			// ---------------------Classification for the rest of activities by
-			// using Chris's-------------------------//
+		}
+		Log.v(Constants.DEBUG_TAG, "Classification thread exiting.");
+
+	}
+
+	private String processData(SampleBatch batch) throws InterruptedException, RemoteException {
+		Log.v(Constants.DEBUG_TAG, "Processing batch.");
+		
+		//	get local copies of the data
+		float[][] data = batch.data;
+		int size = batch.getSize();
+		long sampleTime = batch.sampleTime;
+		boolean chargingState = false;//batch.isCharging();
+		float[] dataMeans = calcSampleStatistics.createVector(),
+				dataSd = calcSampleStatistics.createVector();
+		
+		calibrator.processData(sampleTime, data, size, dataMeans, dataSd);
+		
+		if (!isCalibrated && calibrator.isCalibrated()) {
+			Log.v(Constants.DEBUG_TAG, "Calibration just finished. Saving values to DB.");
+			
+			float[] sd = calibrator.getSd();
+			float[] mean = calibrator.getMean();
+			int count = calibrator.getCount();
+			
+			optionQuery.setCalibrationState(true);
+			optionQuery.setMeanX(mean[Constants.ACCEL_X_AXIS]);
+			optionQuery.setMeanY(mean[Constants.ACCEL_Y_AXIS]);
+			optionQuery.setMeanZ(mean[Constants.ACCEL_Z_AXIS]);
+			optionQuery.setStandardDeviationX(sd[Constants.ACCEL_X_AXIS]);
+			optionQuery.setStandardDeviationY(sd[Constants.ACCEL_Y_AXIS]);
+			optionQuery.setStandardDeviationZ(sd[Constants.ACCEL_Z_AXIS]);
+			optionQuery.setCount(count);
+			optionQuery.setValueOfGravity(calibrator.getValueOfGravity());
+			
+			optionQuery.save();
+			
+			isCalibrated = true;
+		}
+		
+		String classification = "UNCLASSIFIED/UNKNOWN";
+		
+		//	check the current gravity, rotate and perform classification
+		{			
+			float calcGravity = calcSampleStatistics.calcMag(dataMeans);
+			float diffGravity = calcGravity-Constants.GRAVITY;
+			if (diffGravity<0.0)
+				diffGravity = -diffGravity;
+			if (diffGravity>Constants.GRAVITY_DEV) {
+				Log.v(Constants.DEBUG_TAG, "Deviation from gravity too large! Found gravity="+calcGravity+", expected gravity="+Constants.GRAVITY);
+				return "";
+			}
+
+			// first rotate samples to world-orientation
+			//	TODO: Gravity and Gravity Deviation values should come from the calibration values,
+			//		which means calibration should be handled in some other way.
+			if (rotateSamples.rotateToWorldCoordinates(dataMeans, data)) {
+				classification = classifier.classifyRotated(data);
+			} else {
+				Log.v(Constants.DEBUG_TAG, "Unable to perform classification, data could not be rotated!");
+			}
+		}
+		
+		if (calibrator.isUncarried()) {
+			if (classification.contains("TRAVELLING"))
+				return "CLASSIFIED/UNCARRIED/TRAVELLING";
 			else
-			{
-				// ignore the very first classification
-				if (ignore[0] != 1) {
-					if (!keepLastAvgAccel) {
-						lastaverage[0] = 0;
-						lastaverage[1] = 0;
-						lastaverage[2] = 0;
-					}
-					classification = classifier.classifyRotated(data);
-					keepLastAvgAccel = false;
-				} else {
-					classification = "CLASSIFIED/WAITING";
-				}
-			}
-			 }
-			
-			// Log.i(getClass().getName(), "Classification: " + classification);
-    	}
-    }
-    
+				return "CLASSIFIED/UNCARRIED";
+		}
+		
+		if (chargingState) {
+			if (classification.contains("TRAVELLING"))
+				return "CLASSIFIED/CHARGING/TRAVELLING";
+			else
+				return "CLASSIFIED/CHARGING";
+		}
+		
+		return classification;
+	}
+	
 }
-
-

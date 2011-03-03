@@ -22,11 +22,15 @@
 
 package activity.classifier.accel;
 
+import java.util.Arrays;
+
+import activity.classifier.common.Constants;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.util.Log;
 
 /**
  * An accelerometer reader which reads real data from the device's
@@ -52,9 +56,10 @@ public class RealAccelReader implements AccelReader {
         	synchronized (values[nextValues]) {
             	values[nextValues][0] = event.values[SensorManager.DATA_X]; 
             	values[nextValues][1] = event.values[SensorManager.DATA_Y]; 
-            	values[nextValues][2] = event.values[SensorManager.DATA_Z]; 
+            	values[nextValues][2] = event.values[SensorManager.DATA_Z];
 			}
         	currentValues = nextValues;
+        	valuesAssigned = true;
         }
 
         /** {@inheritDoc} */
@@ -66,6 +71,7 @@ public class RealAccelReader implements AccelReader {
     };
 
     float[][] values = new float[BUFFER_SIZE][3];
+    boolean valuesAssigned = false;
     int currentValues = 0;
     private SensorManager manager;
 
@@ -84,6 +90,15 @@ public class RealAccelReader implements AccelReader {
     }
 
     public void assignSample(float[] values) {
+    	//	sometimes values are requested before the first
+    	//		accelerometer sensor change event has occurred,
+    	//		so wait for the sensor to change.
+    	if (!valuesAssigned) {
+    		Log.v(Constants.DEBUG_TAG, "No values assigned yet from accelerometer, going to wait for values.");
+	    	while (!valuesAssigned) {
+	    		Thread.yield();
+	    	}
+    	}
     	int j = this.currentValues;
     	synchronized (this.values[j]) {
         	for (int i=0; i<3; ++i)

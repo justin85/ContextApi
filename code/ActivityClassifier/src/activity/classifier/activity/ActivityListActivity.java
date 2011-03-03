@@ -189,12 +189,12 @@ public class ActivityListActivity extends Activity {
 
 		//	starts scheduled interface updates
 		public void start() {
-			handler.postDelayed(updateInterfaceRunnable, Constants.DELAY_UI_UPDATE);
+			handler.postDelayed(this, Constants.DELAY_UI_UPDATE);
 		}
 
 		//	stops scheduled interface updates
 		public void stop() {
-			handler.removeCallbacks(updateInterfaceRunnable);
+			handler.removeCallbacks(this);
 		}
 
 		//	performs a once-off unsynchronised (unscheduled) interface update
@@ -204,8 +204,12 @@ public class ActivityListActivity extends Activity {
 			if (reentrantLock.tryLock()) {
 
 				try {
-					updateUI();
+					if(service!=null && service.isRunning()){
+						updateUI();
+					}
 				} catch (ParseException ex) {
+					Log.e(Constants.DEBUG_TAG, "Error while performing scheduled UI update.", ex);
+				} catch (RemoteException ex) {
 					Log.e(Constants.DEBUG_TAG, "Error while performing scheduled UI update.", ex);
 				}
 
@@ -215,30 +219,19 @@ public class ActivityListActivity extends Activity {
 
 		public void run() {
 			try {
-				if(service!=null){
-					if(service.isRunning()){
-						if (reentrantLock.tryLock()) {
-
-							try {
-
-								updateUI();
-
-							} catch (ParseException e) {
-								e.printStackTrace();
-							}
-
-							reentrantLock.unlock();
+				if (reentrantLock.tryLock()) {
+					try {
+						if(service!=null && service.isRunning()){
+							updateUI();
 						}
-						handler.postDelayed(updateInterfaceRunnable, Constants.DELAY_UI_GRAPHIC_UPDATE);
-					}else{
-						handler.postDelayed(updateInterfaceRunnable, 500);
+					} catch (ParseException e) {
+						e.printStackTrace();
 					}
-				}else{
-
-					handler.postDelayed(updateInterfaceRunnable, 500);
+					reentrantLock.unlock();
 				}
+				
+				handler.postDelayed(this, Constants.DELAY_UI_GRAPHIC_UPDATE);
 			} catch (RemoteException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -285,7 +278,11 @@ public class ActivityListActivity extends Activity {
 							}
 
 							for (int i = 1; i <= classification.size(); i++) {
-								adapter.add(classification.get(classification.size()-i).withContext(ActivityListActivity.this));
+								Classification c = classification.get(classification.size()-i);
+								if (c!=null)
+									c = c.withContext(ActivityListActivity.this);
+								if (c!=null)
+									adapter.add(c);
 							}
 							Log.i("countActivityTable","#2"+adapter.getCount());
 							Log.i("countActivityTable","#3"+classification.size());

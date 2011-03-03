@@ -206,7 +206,6 @@ public class Sensors extends Activity {
         }
 
         public void onAccuracyChanged(int sensor, int accuracy) {
-            // TODO Auto-generated method stub
             
         }
     }

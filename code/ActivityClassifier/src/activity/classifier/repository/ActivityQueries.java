@@ -288,9 +288,7 @@ public class ActivityQueries extends Queries{
 	 */
 	public synchronized int getSizeOfTable(){
 		dbAdapter.open();
-		Cursor result = dbAdapter.fetchSizeOfRow();
-		int count=result.getCount();
-		result.close();
+		int count=dbAdapter.fetchSizeOfRow();
 		dbAdapter.close();
 		return count;
 	}

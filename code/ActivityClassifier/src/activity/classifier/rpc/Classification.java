@@ -8,10 +8,12 @@ package activity.classifier.rpc;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import activity.classifier.common.Constants;
 import android.content.Context;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.format.DateFormat;
+import android.util.Log;
 
 /**
  *
@@ -28,11 +30,15 @@ public class Classification implements Parcelable {
 	private long end;
 	public Classification(final String classification, final long start) {
 		this.classification = classification;
+		if (this.classification==null)
+			throw new RuntimeException("Invalid classification with classification name as NULL");
 		this.start = start;
 		this.end = start;
 	}
 	public Classification(final String classification, final long start, final long end) {
 		this.classification = classification;
+		if (this.classification==null)
+			throw new RuntimeException("Invalid classification with classification name as NULL");
 		this.start = start;
 		this.end = end;
 	}
@@ -98,26 +104,35 @@ public class Classification implements Parcelable {
 	}
 
 	public Classification withContext(final Context context) {
-		String name = "activity" + (getClassification().length() == 0
-				? "_unknown" : getClassification().substring(10)
-						.replace("/", "_").toLowerCase());
+		if (classification==null) {
+			throw new RuntimeException("No classification exists");
+		}
+		
+		String name = "activity" + 
+			((classification==null || classification.length() == 0)? 
+					"_unknown" :
+						classification.substring(classification.indexOf("/")).replace("/", "_").toLowerCase()
+						);
+		
+		//Log.v(Constants.DEBUG_TAG, "Classification derived name: '"+name+"' from: '"+classification+"'");
 
 		if(!name.equals("activity_waitng")){
-			niceClassification = context.getResources().getText(
-					context.getResources().getIdentifier(name, "string",
-					"activity.classifier"));
+			int id = context.getResources().getIdentifier(
+					name, "string", "activity.classifier");
+			if (id>0)
+				niceClassification = context.getResources().getText(id);
+			else
+				throw new RuntimeException("Unrecognized Activity classified as '"+classification+"'");
 		}else{
-			niceClassification = "waitng";
+			niceClassification = "waiting";
 		}
 
 
 		Date date = new Date(start);
 		Date enddate = new Date(end);
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z"); 
-		//        java.text.SimpleDateFormat timeFormat = (SimpleDateFormat) SimpleDateFormat.getTimeInstance();
 
-		startTime = dateFormat.format(date);
-		endTime = dateFormat.format(enddate);
+		startTime = Constants.DB_DATE_FORMAT.format(date);
+		endTime = Constants.DB_DATE_FORMAT.format(enddate);
 		return this;
 	}
 

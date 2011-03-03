@@ -23,7 +23,6 @@
 package activity.classifier.geo;
 
 import android.content.Context;
-import activity.classifier.common.BaseFactory;
 
 /**
  * A factory which can create relevant {@link LocationMonitor} instances.

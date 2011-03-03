@@ -10,21 +10,19 @@ import android.util.Log;
 
 /**
  *	Extracts features from a given sample window.
- *	The window could be already rotated to world-orientation, hence
- *	use the function {@link #extractRotated(float[][], int)} or
- *	if not previously rotated, use the function {@link #extractUnrotated(float[][], int)}.
+ *	The window could be already rotated to world-orientation.
+ *	This class abstracts which features of the sampled data
+ *	is extracted and later provided to the classifier.
  *
  *
  * @author Umran
  */
 public class FeatureExtractor {
 
-    public static final int NUM_FEATURES = 4;
+    public static final int NUM_FEATURES = 2;
 
-    public static final int FEATURE_RANGE_HOR   = 0;
-    public static final int FEATURE_RANGE_VER   = 1;
-    public static final int FEATURE_MEAN_HOR    = 2;
-    public static final int FEATURE_MEAN_VER    = 3;
+    public static final int FEATURE_HOR_FEATURE   = 0;
+    public static final int FEATURE_VER_FEATURE   = 1;
 
     private int windowSize;
     private RotateSamplesToVerticalHorizontal rotate;
@@ -43,36 +41,6 @@ public class FeatureExtractor {
         this.features = new float[NUM_FEATURES];
     }
 
-    synchronized
-    public float[] extractUnrotated(float[][] input, int windowStart)
-    {
-        if (windowStart+windowSize>input.length) {
-            Log.w(Constants.DEBUG_TAG, "attempting to extract features past " +
-                    "the end of samples (windowStart="+windowStart+", size="+samples.length+")");
-            return null;
-        }
-
-        for (int j=0; j<windowSize; ++j) {
-            samples[j][0] = input[windowStart+j][0];
-            samples[j][1] = input[windowStart+j][1];
-            samples[j][2] = input[windowStart+j][2];
-        }
-
-        if (!rotate.rotateToWorldCoordinates(samples)) {
-//            System.out.println("WARNING: Unable to rotate samples)");
-            return null;
-        }
-
-        for (int j=0; j<windowSize; ++j) {
-            twoDimSamples[j][0] = (float)Math.sqrt(
-                    samples[j][0]*samples[j][0] +
-                    samples[j][1]*samples[j][1]);
-            twoDimSamples[j][1] = samples[j][2];
-        }
-
-        return internExtract();
-    }
-    
     synchronized
     public float[] extractRotated(float[][] input, int windowStart)
     {
@@ -97,13 +65,14 @@ public class FeatureExtractor {
 
         float[] min = sampleStats.getMin();
         float[] max = sampleStats.getMax();
-        float[] mean = sampleStats.getMean();
-
-        features[FEATURE_RANGE_HOR] = max[0]-min[0];
-        features[FEATURE_RANGE_VER] = max[1]-min[1];
-        features[FEATURE_MEAN_HOR] = mean[0];
-        features[FEATURE_MEAN_VER] = mean[1];
-
+//        float[] mean = sampleStats.getMean();
+//        float[] stddev = sampleStats.getStandardDeviation();
+        
+      features[FEATURE_HOR_FEATURE] = max[0]-min[0];
+      features[FEATURE_VER_FEATURE] = max[1]-min[1];
+//      features[FEATURE_HOR_FEATURE] = stddev[0];
+//      features[FEATURE_VER_FEATURE] = stddev[1];
+        
         return features;
     }
 

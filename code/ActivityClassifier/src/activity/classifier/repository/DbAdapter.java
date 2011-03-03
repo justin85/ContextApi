@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 
+import activity.classifier.common.Constants;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -69,16 +70,40 @@ public class DbAdapter {
 	 * startinfo Table creation sql statement
 	 */
 	private static final String DATABASE_STARTINFO_CREATE =
-		"create table startinfo (_id integer primary key autoincrement, "
-		+ "isServiceRunning text not null, isCalibrated text not null, valueOfGravity text not null, " +
-		"sdX text not null, sdY text not null, sdZ text not null, isAccountSent text not null, " +
-		"isWakeLockSet text not null);";
+		"create table startinfo (" +
+			"_id integer primary key autoincrement, " +
+			"isServiceRunning text not null, " +
+			"isCalibrated text not null, " +
+			"valueOfGravity text not null, " +
+			"sdX text not null, " +
+			"sdY text not null, " +
+			"sdZ text not null, " +
+			"meanX text not null, " +
+			"meanY text not null, " +
+			"meanZ text not null, " +
+			"count text not null, " +
+			"isAccountSent text not null, " +
+			"isWakeLockSet text not null" +
+		");";
 
 	/**
 	 *  sql statement for initialising values in startinfo Table 
 	 */
 	private static final String DATABASE_STARTINFO_INIT =
-		"insert into startinfo values (null, 0, 0, 1, 0.05, 0.05, 0.05, 0, 0);";
+		"insert into startinfo values (" +
+			"null, " +
+			"0, " +
+			"0, " +
+			"1, " +
+			"0.05, " +
+			"0.05, " +
+			"0.05, " +
+			"0.0, " +
+			"0.0, " +
+			"0.0, " +
+			"0, " +
+			"0, " +
+			"0);";
 	
 
 	/**
@@ -168,7 +193,12 @@ public class DbAdapter {
 	 */
 	public DbAdapter open() throws SQLException {
 		mDbHelper = new DatabaseHelper(mCtx);
-		_db = mDbHelper.getWritableDatabase();
+		try {
+			_db = mDbHelper.getWritableDatabase();
+		} catch (SQLException e) {
+			Log.e(Constants.DEBUG_TAG, "Error while trying to open the database", e);
+			throw e;
+		}
 		return this;
 	}
 
@@ -195,8 +225,12 @@ public class DbAdapter {
 
 		if(mCursor!=null)
 			mCursor.moveToNext();
+		
+		String value = mCursor.getString(1); 
+		
+		mCursor.close();
 
-		return mCursor.getString(1);
+		return value;
 	}
 
 	/**
@@ -211,9 +245,13 @@ public class DbAdapter {
 					new String[] { KEY_ROWID, fieldName }, KEY_ROWID + "=" + 1, null, null, null, null, null);
 
 		if(mCursor!=null)
-			mCursor.moveToNext();    
+			mCursor.moveToNext();
+		
+		int value =(int) Float.valueOf(mCursor.getString(1).trim()).floatValue(); 
+		
+		mCursor.close();
 
-		return (int) Float.valueOf(mCursor.getString(1).trim()).floatValue();
+		return value;
 	}
 
 	/**
@@ -227,10 +265,13 @@ public class DbAdapter {
 			_db.query(true, DATABASE_STARTINFO_TABLE, 
 					new String[] { KEY_ROWID, fieldName }, KEY_ROWID + "=" + 1, null, null, null, null, null);
 
-		if(mCursor!=null)
-			mCursor.moveToNext();
+		mCursor.moveToNext();
+		
+		float value = Float.valueOf(mCursor.getString(1).trim()).floatValue(); 
 
-		return Float.valueOf(mCursor.getString(1).trim()).floatValue();
+		mCursor.close();
+		
+		return value;
 	}
 
 	/**
@@ -250,13 +291,13 @@ public class DbAdapter {
 
 	//  ---------------------Start Activity Table----------------------------------
 
-	public synchronized  Cursor fetchSizeOfRow()throws SQLException {
+	public synchronized int fetchSizeOfRow()throws SQLException {
 		Cursor mCursor =
 			_db.query(true, DATABASE_ACTIVITY_TABLE, 
 					new String[] { KEY_ROWID, KEY_ACTIVITY,KEY_START_DATE,KEY_END_DATE,KEY_isChecked },  null, null, null, null, null, null);
-
-
-		return mCursor;
+		int count=mCursor.getCount();
+		mCursor.close();
+		return count;
 	}
 	/**
 	 * Insert new activity information 
@@ -297,8 +338,6 @@ public class DbAdapter {
 		Cursor mCursor =
 			_db.query(true, DATABASE_ACTIVITY_TABLE, 
 					new String[] { KEY_ROWID, KEY_ACTIVITY,KEY_START_DATE,KEY_END_DATE,KEY_isChecked }, KEY_isChecked + "=" + isChecked, null, null, null, null, null);
-
-
 		return mCursor;
 	}
 	private boolean isActivityBetweenToday;
@@ -352,7 +391,6 @@ public class DbAdapter {
 			i++;
 		}
 		mCursor.close();
-
 		return items;
 	}
 
@@ -365,9 +403,9 @@ public class DbAdapter {
 	public synchronized  String fetchLastItemNames(long rowId){
 		Cursor mCursor = _db.query(true, DATABASE_ACTIVITY_TABLE,
 				new String[] { KEY_ACTIVITY}, KEY_ROWID + "=" + rowId, null, null, null, null, null);
-		if(mCursor!=null)
-			mCursor.moveToNext();
+		mCursor.moveToNext();
 		String activityName = mCursor.getCount()>0?mCursor.getString(0):null;
+		mCursor.close();
 		return activityName;
 	}
 
@@ -379,10 +417,9 @@ public class DbAdapter {
 	public synchronized  String fetchLastItemEndDate(long rowId){
 		Cursor mCursor = _db.query(true, DATABASE_ACTIVITY_TABLE,
 				new String[] { KEY_END_DATE}, KEY_ROWID + "=" + rowId, null, null, null, null, null);
-		if(mCursor!=null)
-			mCursor.moveToNext();
-
+		mCursor.moveToNext();
 		String activityDate = mCursor.getString(0);
+		mCursor.close();
 		return activityDate;
 	}
 
@@ -394,9 +431,9 @@ public class DbAdapter {
 	public synchronized  String fetchLastItemStartDate(long rowId){
 		Cursor mCursor = _db.query(true, DATABASE_ACTIVITY_TABLE,
 				new String[] { KEY_START_DATE}, KEY_ROWID + "=" + rowId, null, null, null, null, null);
-		if(mCursor!=null)
-			mCursor.moveToNext();
+		mCursor.moveToNext();
 		String activityDate = mCursor.getString(0);
+		mCursor.close();
 		return activityDate;
 	}
 
@@ -404,8 +441,8 @@ public class DbAdapter {
 		Cursor mCursor = _db.query(true, DATABASE_ACTIVITY_TABLE,
 				new String[] { KEY_ROWID, KEY_ACTIVITY,KEY_START_DATE,KEY_END_DATE,KEY_isChecked }, KEY_ACTIVITY + "=" + itemName, null, null, null, null, null);
 
-		if(mCursor!=null)
-			mCursor.moveToNext();
+		mCursor.moveToNext();
+		
 		return mCursor;
 	}
 

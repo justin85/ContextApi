@@ -1,5 +1,6 @@
 package activity.classifier.utils;
 
+import activity.classifier.common.Constants;
 import android.util.Log;
 
 /**
@@ -60,7 +61,7 @@ public class CalcStatistics {
 	 * The mean of the array data.
 	 */
 	private float mean[];
-
+	
 	public CalcStatistics(int dimensions) {
 		this.dimensions = dimensions;
 
@@ -115,6 +116,7 @@ public class CalcStatistics {
 		for (int j = 0; j < dimensions; j++) {
 			mean[j] = sum[j] / (samples);
 		}
+
 	}
 
 	/**
@@ -162,15 +164,23 @@ public class CalcStatistics {
 	 * @return standard deviation of all the items that have been entered. Value
 	 *         will be Double.NaN if count == 0.
 	 */
-	public float[] getStandardDeviation() {
-		float standardDeviation[] = new float[dimensions];
+	public float[] computeStandardDeviation(float[] standardDeviation) {
 		for (int j = 0; j < dimensions; j++) {
-			Log.i("sd", "count" + count + " sum_sqr " + sumSqr[j] + " mean "
-					+ mean[j] + " ");
+//			Log.i("sd", "count" + count + " sum_sqr " + sumSqr[j] + " mean "
+//					+ mean[j] + " ");
 			standardDeviation[j] = (float) Math.sqrt(sumSqr[j] / count
 					- mean[j] * mean[j]);
 		}
 		return standardDeviation;
+	}
+	
+	/**
+	 * 
+	 * @return standard deviation of all the items that have been entered. Value
+	 *         will be Double.NaN if count == 0.
+	 */
+	public float[] getStandardDeviation() {
+		return computeStandardDeviation(new float[dimensions]);
 	}
 
 	/**
@@ -190,4 +200,33 @@ public class CalcStatistics {
 	public float[] getMax() {
 		return max;
 	}
+	
+	/**
+	 * Computes the magnitude of a vector.
+	 * 
+	 * @param vec
+	 * A vector of dimensions as given when the instance is constructed
+	 * using {@link #CalcStatistics(int)}
+	 * 
+	 * @return
+	 * the magnitude of the vector
+	 */
+	public float calcMag(float[] vec) {
+		double mag = 0.0f;
+		for (int i=0; i<dimensions; ++i)
+			mag += vec[i]*vec[i];
+		return (float)Math.sqrt(mag);
+	}
+	
+	/**
+	 * Creates a vector of the dimensions given when this instance is
+	 * initialised.
+	 * 
+	 * @return
+	 * A vector of given dimensions
+	 */
+	public float[] createVector() {
+		return new float[dimensions];
+	}	
+	
 }

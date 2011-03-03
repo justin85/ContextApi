@@ -60,7 +60,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 					service.setWakeLock();
 				}
 			} catch (RemoteException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -87,7 +86,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 		}
 		Log.i("isrunning",connection+"");
 		Log.i("isrunning","Createy "+service+"");
-		// TODO Auto-generated catch block
 		setPreferenceScreen(createPreferenceHierarchy());
 
 
@@ -102,7 +100,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 			try {
 				Log.i("isrunning","Stop "+service.isRunning()+"");
 			} catch (RemoteException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 	}
@@ -117,7 +114,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 			try {
 				Log.i("isrunning","Stop "+service.isRunning()+"");
 			} catch (RemoteException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 	}
@@ -188,7 +184,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 		screenPref.setOnPreferenceChangeListener(new CheckBoxPreference.OnPreferenceChangeListener(){
 
 			public boolean onPreferenceChange(Preference arg0, Object arg1) {
-				// TODO Auto-generated method stub
 				if((Boolean) arg1){
 					wakelock=(Boolean) arg1;//true value
 					Toast.makeText(getBaseContext(), "Screen Locked On", Toast.LENGTH_SHORT).show();
@@ -236,7 +231,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 
 			public boolean onPreferenceClick(Preference preference) {
 				showDialog(DIALOG_YES_NO_MESSAGE_FOR_RESET_CALIBRATION);
-				// TODO Auto-generated method stub
 				
 				return false;
 			}
@@ -263,7 +257,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 		deletePref.setOnPreferenceClickListener(new PreferenceScreen.OnPreferenceClickListener(){
 
 			public boolean onPreferenceClick(Preference preference) {
-				// TODO Auto-generated method stub
 				showDialog(DIALOG_YES_NO_MESSAGE_FOR_DELETION);
 				return false;
 			}
@@ -278,7 +271,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 		copyPref.setOnPreferenceClickListener(new PreferenceScreen.OnPreferenceClickListener(){
 
 			public boolean onPreferenceClick(Preference preference) {
-				// TODO Auto-generated method stub
 				File sdcard = Environment.getExternalStorageDirectory();
 				File dbpath = new File(sdcard.getAbsolutePath() + File.separator
 						+ "activityclassfier");

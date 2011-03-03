@@ -221,7 +221,6 @@ public class ActivityChartActivity extends Activity {
 				}
 
 			} catch (ParseException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -282,7 +281,6 @@ public class ActivityChartActivity extends Activity {
 		}
 
 		public void run() {
-			Log.i("Run","Data1");
 			try {
 				if(service!=null){
 					if(service.isRunning()){
@@ -307,7 +305,6 @@ public class ActivityChartActivity extends Activity {
 					handler.postDelayed(updateInterfaceRunnable, 500);
 				}
 			} catch (RemoteException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 

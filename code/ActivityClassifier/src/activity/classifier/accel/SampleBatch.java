@@ -19,14 +19,13 @@ import android.util.Log;
  */
 public class SampleBatch {
 	
+	public long sampleTime;
 	public final float[][] data;
 	private int currentSample;
 	private boolean charging;
-	private float ignore[];
-	private String lastClassificationName;
 	
 	public SampleBatch() {
-		data = new float[Constants.NUM_OF_SAMPLES_PER_BATCH][3];
+		data = new float[Constants.NUM_OF_SAMPLES_PER_BATCH][Constants.ACCEL_DIM];
 		currentSample = 0;
 	}
 	
@@ -61,23 +60,6 @@ public class SampleBatch {
 	public void setCharging(boolean charging) {
 		this.charging = charging;
 	}
-
-	public float[] getIgnore() {
-		return ignore;
-	}
-
-	public void setIgnore(float[] ignore) {
-		this.ignore = ignore;
-	}
-
-	public String getLastClassificationName() {
-		return lastClassificationName;
-	}
-
-	public void setLastClassificationName(String lastClassificationName) {
-		this.lastClassificationName = lastClassificationName;
-	}
-	
 	
 	
 }
