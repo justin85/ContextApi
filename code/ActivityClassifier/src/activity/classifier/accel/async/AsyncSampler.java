@@ -20,8 +20,10 @@
  * SOFTWARE.
  */
 
-package activity.classifier.accel;
+package activity.classifier.accel.async;
 
+import activity.classifier.accel.SampleBatch;
+import activity.classifier.accel.Sampler;
 import activity.classifier.common.Constants;
 import activity.classifier.rpc.Classification;
 import android.os.Handler;
@@ -29,16 +31,16 @@ import android.util.Log;
 
 /**
  * A utility class which handles sampling accelerometer data from an
- * {@link AccelReader}. The Sampler takes 128 samples with a 50ms delay between
+ * {@link AsyncAccelReader}. The Sampler takes 128 samples with a 50ms delay between
  * each sample. When the Sampler has finished, it executes a runnable so that
  * the data may be retrieved and analysed.
  *
  * @author chris
  */
-public class SimpleSampler implements Runnable, Sampler {
+public class AsyncSampler implements Runnable, Sampler {
 
     private final Handler handler;
-    private final AccelReader reader;
+    private final AsyncAccelReader reader;
     private final Runnable finishedRunnable;
     
     private SampleBatch currentBatch;
@@ -50,7 +52,7 @@ public class SimpleSampler implements Runnable, Sampler {
     private long maxTimeDelay;
     private long cummTimeError;
     */
-    public SimpleSampler(final Handler handler, final AccelReader reader,
+    public AsyncSampler(final Handler handler, final AsyncAccelReader reader,
             final Runnable finishedRunnable) {
         this.handler = handler;
         this.reader = reader;
@@ -95,7 +97,7 @@ public class SimpleSampler implements Runnable, Sampler {
     	if (maxTimeDelay<currTimeDelay)
     		maxTimeDelay = currTimeDelay;
     	*/
-    	reader.assignSample(currentBatch.getCurrentSample());
+    	reader.assignSample(currentBatch);
     	//Log.i("accel",currentBatch.getCurrentSample()[0]+" "+currentBatch.getCurrentSample()[1]+" "+currentBatch.getCurrentSample()[2]);
     	if (!currentBatch.nextSample()) {
     		/*

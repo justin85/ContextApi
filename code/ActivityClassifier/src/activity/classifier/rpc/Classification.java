@@ -28,6 +28,7 @@ public class Classification implements Parcelable {
 	private final String classification;
 	private final long start;
 	private long end;
+	
 	public Classification(final String classification, final long start) {
 		this.classification = classification;
 		if (this.classification==null)
@@ -88,10 +89,9 @@ public class Classification implements Parcelable {
 			duration = (length / (60 * 60)) + " hrs";
 		}
 
-		if(niceClassification.equals("waiting")){
+		if(niceClassification.equals("waiting") || classification.equals("END")){
 			return niceClassification+"";
 		}
-
 		else{
 			return niceClassification + "\n" + startTime + " for " + duration;
 		}
@@ -108,32 +108,39 @@ public class Classification implements Parcelable {
 			throw new RuntimeException("No classification exists");
 		}
 		
-		String name = "activity" + 
-			((classification==null || classification.length() == 0)? 
-					"_unknown" :
-						classification.substring(classification.indexOf("/")).replace("/", "_").toLowerCase()
-						);
-		
-		//Log.v(Constants.DEBUG_TAG, "Classification derived name: '"+name+"' from: '"+classification+"'");
-
-		if(!name.equals("activity_waitng")){
-			int id = context.getResources().getIdentifier(
-					name, "string", "activity.classifier");
-			if (id>0)
-				niceClassification = context.getResources().getText(id);
-			else
-				throw new RuntimeException("Unrecognized Activity classified as '"+classification+"'");
-		}else{
-			niceClassification = "waiting";
-		}
-
+		this.niceClassification = getNiceName(context, classification);
 
 		Date date = new Date(start);
 		Date enddate = new Date(end);
 
 		startTime = Constants.DB_DATE_FORMAT.format(date);
 		endTime = Constants.DB_DATE_FORMAT.format(enddate);
+		
 		return this;
+	}
+	
+	public static String getNiceName(Context context, String classification)
+	{
+		String name = "activity_" + 
+				((classification==null || classification.length() == 0)? 
+					"unknown" :
+					classification.replace("/", "_").toLowerCase()
+					);
+	
+		//Log.v(Constants.DEBUG_TAG, "Classification derived name: '"+name+"' from: '"+classification+"'");
+	
+		if(!name.equals("activity_waitng")){
+			int id = context.getResources().getIdentifier(
+					name, "string", "activity.classifier");
+			if (id>0)
+				return (String) context.getResources().getText(id);
+			else {
+				throw new RuntimeException("Unrecognized Activity classified as '"+classification+"' ('"+name+"')");
+				//return classification;
+			}
+		}else{
+			return "waiting";
+		}
 	}
 
 	public static final Parcelable.Creator<Classification> CREATOR

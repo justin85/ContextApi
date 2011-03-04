@@ -20,19 +20,19 @@
  * SOFTWARE.
  */
 
-package activity.classifier.accel;
+package activity.classifier.accel.sync;
+
+import android.content.Context;
 
 /**
- * Interface implemented by classes which can sample accelerometer data.
- * 
+ * A factory which can produce an appropriate {@link SyncAccelReader}.
+ *
  * @author chris
  */
-public interface AccelReader {
+public class SyncAccelReaderFactory {
 
-    void startSampling();
-
-    void stopSampling();
-
-    public void assignSample(float[] values);
+    public SyncAccelReader getReader(final Context context) {
+        return new SyncRealAccelReader(context);
+    }
 
 }

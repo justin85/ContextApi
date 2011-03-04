@@ -1,10 +1,11 @@
 package activity.classifier.accel;
 
+import activity.classifier.accel.async.AsyncAccelReader;
 import activity.classifier.common.Constants;
 import android.util.Log;
 
 /**
- * Collects samples from the Accelerometer Reader {@link AccelReader} over a period of
+ * Collects samples from the Accelerometer Reader {@link AsyncAccelReader} over a period of
  * time. The samples collected over the period are saved in the {@link SampleBatch}.
  * 
  * @author Umran

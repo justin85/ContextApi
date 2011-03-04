@@ -63,6 +63,10 @@ public abstract class TwoWayBlockingQueue<InstanceType> {
 		return filledInstances.size();
 	}
 	
+	public int getPendingEmptyInstances() {
+		return emptyInstances.size();
+	}
+	
 	public void assertAllAvailable() {
 		int filledInst = filledInstances.size();
 		int emptyInst = emptyInstances.size();

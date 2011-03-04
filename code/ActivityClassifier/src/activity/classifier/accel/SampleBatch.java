@@ -20,17 +20,21 @@ import android.util.Log;
 public class SampleBatch {
 	
 	public long sampleTime;
+	public final long[] timeStamps;
 	public final float[][] data;
 	private int currentSample;
 	private boolean charging;
 	
 	public SampleBatch() {
 		data = new float[Constants.NUM_OF_SAMPLES_PER_BATCH][Constants.ACCEL_DIM];
+		timeStamps = new long[Constants.NUM_OF_SAMPLES_PER_BATCH];
 		currentSample = 0;
 	}
 	
-	public float[] getCurrentSample() {
-		return data[currentSample];
+	public void assignSample(float[] data) {
+		timeStamps[currentSample] = System.currentTimeMillis();
+		for (int d=0; d<Constants.ACCEL_DIM; ++d)
+			this.data[currentSample][d] = data[d];
 	}
 	
 	public boolean nextSample() {

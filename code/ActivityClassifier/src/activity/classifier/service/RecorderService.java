@@ -28,14 +28,17 @@ import org.apache.http.impl.client.DefaultHttpClient;
 
 import activity.classifier.R;
 import activity.classifier.R.raw;
-import activity.classifier.accel.AccelReader;
-import activity.classifier.accel.AccelReaderFactory;
 import activity.classifier.accel.SampleBatch;
 import activity.classifier.accel.SampleBatchBuffer;
 import activity.classifier.accel.Sampler;
 import activity.classifier.activity.ActivityListActivity;
 import activity.classifier.activity.MainTabActivity;
-import activity.classifier.accel.SimpleSampler;
+import activity.classifier.accel.async.AsyncAccelReader;
+import activity.classifier.accel.async.AsyncAccelReaderFactory;
+import activity.classifier.accel.async.AsyncSampler;
+import activity.classifier.accel.sync.SyncAccelReader;
+import activity.classifier.accel.sync.SyncAccelReaderFactory;
+import activity.classifier.accel.sync.SyncSampler;
 import activity.classifier.aggregator.Aggregator;
 import activity.classifier.common.Constants;
 import activity.classifier.model.ModelReader;
@@ -86,7 +89,6 @@ import android.widget.Toast;
 
 public class RecorderService extends Service implements Runnable {
 	
-	private AccelReader reader;
 	private Sampler sampler;
 	private final Aggregator aggregator = new Aggregator();
 	
@@ -338,7 +340,8 @@ public class RecorderService extends Service implements Runnable {
 			if (c==null)
 				return;
 			
-			String activity = c.getNiceClassification();
+			//String activity = c.getNiceClassification();
+			String activity = c.getClassification();
 			String startDate  = c.getStartTime();
 
 			if(activity!=null && !lastAc.equals(activity)){
@@ -348,7 +351,6 @@ public class RecorderService extends Service implements Runnable {
 					activityQuery.updateNewItems(count, startDate);
 				}
 				activityQuery.insertActivities(activity, startDate, 0);
-
 
 			}else{
 				int count = activityQuery.getSizeOfTable();
@@ -364,21 +366,22 @@ public class RecorderService extends Service implements Runnable {
 	
 	private void updateScores(final String newClassification) {
 		
-		aggregator.addClassification(newClassification);
-		String aggrClassification = aggregator.getClassification();
-		if (aggrClassification!=null && !aggrClassification.equals("CLASSIFIED/WAITING")) {
-			final String best = aggrClassification;
-			
-			if (!classifications.isEmpty()
-					&& best.equals(classifications.get(classifications.size() - 1).getClassification())) {
-				classifications.get(classifications.size() - 1).updateEnd(	System.currentTimeMillis());
-			} else {
-				classifications.add(new Classification(best, System.currentTimeMillis()));
-			}
-		}
+		// TODO: Change this before commit
+//		aggregator.addClassification(newClassification);
+//		String aggrClassification = aggregator.getClassification();
+//		if (aggrClassification!=null && !aggrClassification.equals("CLASSIFIED/WAITING")) {
+//			final String best = aggrClassification;
+//			
+//			if (!classifications.isEmpty()
+//					&& best.equals(classifications.get(classifications.size() - 1).getClassification())) {
+//				classifications.get(classifications.size() - 1).updateEnd(	System.currentTimeMillis());
+//			} else {
+//				classifications.add(new Classification(best, System.currentTimeMillis()));
+//			}
+//		}
 		
-//		final String best = newClassification;
-//		classifications.add(new Classification(best, System.currentTimeMillis()));
+		final String best = newClassification;
+		classifications.add(new Classification(best, System.currentTimeMillis()));
 		
 		try {
 			insertNewActivity();
@@ -503,8 +506,11 @@ public class RecorderService extends Service implements Runnable {
         	activityQuery.insertActivities("END", dateFormat.format(date), 0);
         }
         
-		reader = new AccelReaderFactory().getReader(this);
-		sampler = new SimpleSampler(handler, reader, analyseRunnable);
+        AsyncAccelReader reader = new AsyncAccelReaderFactory().getReader(this);
+		sampler = new AsyncSampler(handler, reader, analyseRunnable);
+		
+//        SyncAccelReader reader = new SyncAccelReaderFactory().getReader(this);
+//		sampler = new SyncSampler(reader, analyseRunnable);
 		
 		classifierThread = new ClassifierThread(this, binder, batchBuffer);
 		classifierThread.start();
@@ -523,7 +529,9 @@ public class RecorderService extends Service implements Runnable {
 		uploadActivityHistory = new UploadActivityHistoryThread(this, activityQuery, phoneInfo);		
 		uploadActivityHistory.startUploads();
 		
+		//TODO: CHANGE THIS BEFORE COMMIT
 		handler.postDelayed(registerRunnable, Constants.DELAY_SAMPLE_BATCH);
+		//handler.postDelayed(registerRunnable, 1000);
 
 		// classifications.add(new Classification("CLASSIFIED/WAITING",
 		// System.currentTimeMillis()));

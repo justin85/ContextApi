@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.concurrent.locks.ReentrantLock;
 
 import activity.classifier.common.Constants;
 import android.content.ContentValues;
@@ -64,7 +65,7 @@ public class DbAdapter {
 	private static final String TAG = "DbAdapter";
 
 	private DatabaseHelper mDbHelper;
-	private static SQLiteDatabase _db;  
+	private SQLiteDatabase _db;  
 
 	/**
 	 * startinfo Table creation sql statement
@@ -94,10 +95,10 @@ public class DbAdapter {
 			"null, " +
 			"0, " +
 			"0, " +
-			"1, " +
-			"0.05, " +
-			"0.05, " +
-			"0.05, " +
+			Constants.GRAVITY+", " +
+			Constants.CALIBARATION_BASE_ALLOWED_DEVIATION+", " +
+			Constants.CALIBARATION_BASE_ALLOWED_DEVIATION+", " +
+			Constants.CALIBARATION_BASE_ALLOWED_DEVIATION+", " +
 			"0.0, " +
 			"0.0, " +
 			"0.0, " +
@@ -142,6 +143,8 @@ public class DbAdapter {
 	private static final int DATABASE_VERSION = 2;
 
 	private final Context mCtx;
+	
+	private java.util.concurrent.locks.ReentrantLock reentrantLock = new ReentrantLock(true);
 
 	/**
 	 * Execute sql statement to create tables & initialise startinfo table
@@ -188,10 +191,22 @@ public class DbAdapter {
 
 	/**
 	 * Make the database readable/writable
-	 * @return
+	 * 
+	 * Edit by Umran: <br/>
+	 * Please note that this function is a blocking function.
+	 * It will not return until any other thread using the
+	 * database calls {@link #close()}.
+	 * Hence make sure to follow up each {@link #open()} call
+	 * with a {@link #close()} call. 
+	 * 
 	 * @throws SQLException
 	 */
-	public DbAdapter open() throws SQLException {
+	public void open() throws SQLException {
+		if (!reentrantLock.tryLock()) {
+			Log.d(Constants.DEBUG_TAG, "Attempting to open database when it's still open! Waiting for it to be open.");
+			reentrantLock.lock();
+		}
+		
 		mDbHelper = new DatabaseHelper(mCtx);
 		try {
 			_db = mDbHelper.getWritableDatabase();
@@ -199,7 +214,6 @@ public class DbAdapter {
 			Log.e(Constants.DEBUG_TAG, "Error while trying to open the database", e);
 			throw e;
 		}
-		return this;
 	}
 
 	/**
@@ -207,6 +221,7 @@ public class DbAdapter {
 	 */
 	public void close() {
 		mDbHelper.close();
+		reentrantLock.unlock();
 	}
 
 
@@ -218,7 +233,7 @@ public class DbAdapter {
 	 * @return String data type value 
 	 * @throws SQLException
 	 */
-	public synchronized  String fetchFromStartTableString(String fieldName) throws SQLException {
+	public synchronized String fetchFromStartTableString(String fieldName) throws SQLException {
 		Cursor mCursor =
 			_db.query(true, DATABASE_STARTINFO_TABLE, 
 					new String[] { KEY_ROWID, fieldName }, KEY_ROWID + "=" + 1, null, null, null, null, null);

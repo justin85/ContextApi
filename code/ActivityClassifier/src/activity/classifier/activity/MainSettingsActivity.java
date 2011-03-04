@@ -338,10 +338,10 @@ public class MainSettingsActivity extends PreferenceActivity {
 			.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
 				public void onClick(DialogInterface dialog, int whichButton) {
 					optionQuery.setCalibrationState(false);
-					optionQuery.setValueOfGravity(1);
-					optionQuery.setStandardDeviationX((float)0.05);
-					optionQuery.setStandardDeviationY((float)0.05);
-					optionQuery.setStandardDeviationZ((float)0.05);
+					optionQuery.setValueOfGravity(Constants.GRAVITY);
+					optionQuery.setStandardDeviationX(Constants.CALIBARATION_BASE_ALLOWED_DEVIATION);
+					optionQuery.setStandardDeviationY(Constants.CALIBARATION_BASE_ALLOWED_DEVIATION);
+					optionQuery.setStandardDeviationZ(Constants.CALIBARATION_BASE_ALLOWED_DEVIATION);
 					optionQuery.save();
 					setScreenSummary();
 					caliPref.setSummary(getScreenSummary());

@@ -42,7 +42,7 @@ public class Constants {
 	 */
 	//	TODO: CHANGE THIS BEFORE COMMIT
 	public static final int DELAY_SAMPLE_BATCH = 30*1000; //	30 secs in ms
-	//public static final int DELAY_SAMPLE_BATCH = 10*1000; //	debugging use
+//	public static final int DELAY_SAMPLE_BATCH = 10*1000; //	debugging use
 	
 	/**
 	 * The delay between two consecutive samples in a sample batch.
@@ -96,9 +96,15 @@ public class Constants {
 	public static final float GRAVITY = 9.8f;
 	
 	/**
-	 *	The deviation from gravity that a sample is allowed, any deviation greater than this makes the sample invalid. 
+	 *	The deviation from gravity that a sample is allowed,
+	 *	any deviation greater than this makes the sample invalid.
+	 *
+	 *	Lesser values can be caused due to the phone being rotated
+	 *	during the sampling period, while larger values can be caused
+	 *	because of the phone accelerating fast during the sampling period
+	 *	e.g. in a car after a traffic light.
 	 */
-	public static final float GRAVITY_DEV = 4.5f;
+	public static final float GRAVITY_DEV = 0.15f; // 15% of gravity	
 	
 	/**
 	 * The number of axi on the accelerometer
@@ -123,19 +129,37 @@ public class Constants {
 	/**
 	 * The duration the phone is required to be stationary before doing calibration
 	 */
-	public final static long DURATION_OF_CALIBRATION = 60*1000; // 60 seconds
+	//	TODO: CHANGE THIS BEFORE COMMIT
+	//public final static long DURATION_OF_CALIBRATION = 60*1000; // 60 seconds
+	public final static long DURATION_OF_CALIBRATION = 10*60*1000; // 60 seconds
 
 	/**
-	 * The deviation allowed in the means of the accelerometer axis
+	 * The deviation in the means of the accelerometer axis
 	 * 	within the calibration waiting duration given as {@link #DURATION_WAIT_FOR_CALIBRATION}
+	 * 
+	 * This value is only used initially, after calibration, the values used in
+	 * the calibration are used instead.
+	 * 
+	 * See {@link #CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION} for more info.
 	 */
-	public final static float CALIBARATION_ALLOWED_DEVIATION = 9.8f*0.05f;	// 5% of Gravity
+	public final static float CALIBARATION_BASE_ALLOWED_DEVIATION = 9.8f*0.03f;	// 3% of Gravity
 
+	/**
+	 * This value is multiplied by the {@value #CALIBARATION_BASE_ALLOWED_DEVIATION} value
+	 * to get the range which the phone's accelerometer axis standard deviation is allowed to be in 
+	 * for the phone to be detected as stationary. 
+	 * 
+	 * The {@value #CALIBARATION_BASE_ALLOWED_DEVIATION} value is only used initially, 
+	 * after calibration, the values used in the calibration are used instead.
+	 * 
+	 */
+	public final static float CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION = 5.0f;	// 5 times the standard deviation
+	
 	/**
 	 * The duration which the means of different axis should be the same for the state
 	 * to be uncarried
 	 */
-	public final static long DURATION_WAIT_FOR_UNCARRIED = 30*1000;
+	public final static long DURATION_WAIT_FOR_UNCARRIED = 60*1000;
 	
 	/**
 	 * The format used to store date values into the database

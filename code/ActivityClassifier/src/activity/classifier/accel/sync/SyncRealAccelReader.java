@@ -20,16 +20,18 @@
  * SOFTWARE.
  */
 
-package activity.classifier.accel;
+package activity.classifier.accel.sync;
 
 import java.util.Arrays;
 
+import activity.classifier.accel.SampleBatch;
 import activity.classifier.common.Constants;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Handler;
 import android.util.Log;
 
 /**
@@ -38,28 +40,27 @@ import android.util.Log;
  *
  * @author chris
  */
-public class RealAccelReader implements AccelReader {
+public class SyncRealAccelReader implements SyncAccelReader {
 	
-	//	actually all we need is a buffer size of 2,
-	//	to make sure that values are being written into one
-	//	array while being read from another array, but we
-	//	can keep 3 just in case the listener is filling
-	//	faster than the samples are being read...
-	private static final int BUFFER_SIZE = 3;
-
+	private float temp[] = new float[Constants.ACCEL_DIM];
+	
     private final SensorEventListener accelListener = new SensorEventListener() {
 
         /** {@inheritDoc} */
 //        @Override
         public void onSensorChanged(final SensorEvent event) {
-        	int nextValues = (currentValues + 1) % BUFFER_SIZE;
-        	synchronized (values[nextValues]) {
-            	values[nextValues][0] = event.values[SensorManager.DATA_X]; 
-            	values[nextValues][1] = event.values[SensorManager.DATA_Y]; 
-            	values[nextValues][2] = event.values[SensorManager.DATA_Z];
+        	Log.v(Constants.DEBUG_TAG, "Accel Reader Event");
+        	synchronized (temp) {
+        		temp[Constants.ACCEL_X_AXIS] = event.values[SensorManager.DATA_X]; 
+        		temp[Constants.ACCEL_Y_AXIS] = event.values[SensorManager.DATA_Y]; 
+        		temp[Constants.ACCEL_Z_AXIS] = event.values[SensorManager.DATA_Z];
+            	currentBatch.assignSample(temp);
+            	//	finished sampling
+            	if (!currentBatch.nextSample()) {
+            		stopSampling();
+            		if (finishedRunnable!=null) finishedRunnable.run();
+            	}
 			}
-        	currentValues = nextValues;
-        	valuesAssigned = true;
         }
 
         /** {@inheritDoc} */
@@ -69,45 +70,32 @@ public class RealAccelReader implements AccelReader {
         }
 
     };
-
-    float[][] values = new float[BUFFER_SIZE][3];
-    boolean valuesAssigned = false;
-    int currentValues = 0;
+    
     private SensorManager manager;
+    private SampleBatch currentBatch;
+    private Runnable finishedRunnable;
 
-    public RealAccelReader(final Context context) {
+    public SyncRealAccelReader(final Context context) {
         manager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
     }
 
-    public void startSampling() {
+    public void startSampling(int interSampleDelay, SampleBatch currentBatch, Runnable finishedRunnable) {
+    	this.currentBatch = currentBatch;
+    	this.finishedRunnable = finishedRunnable;
+    	
         manager.registerListener(accelListener,
                 manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
-                SensorManager.SENSOR_DELAY_FASTEST);
+                interSampleDelay*1000);
+                //20000);
     }
 
     public void stopSampling() {
         manager.unregisterListener(accelListener);
     }
 
-    public void assignSample(float[] values) {
-    	//	sometimes values are requested before the first
-    	//		accelerometer sensor change event has occurred,
-    	//		so wait for the sensor to change.
-    	if (!valuesAssigned) {
-    		Log.v(Constants.DEBUG_TAG, "No values assigned yet from accelerometer, going to wait for values.");
-	    	while (!valuesAssigned) {
-	    		Thread.yield();
-	    	}
-    	}
-    	int j = this.currentValues;
-    	synchronized (this.values[j]) {
-        	for (int i=0; i<3; ++i)
-        		values[i] = this.values[j][i];
-		}
-    }
-
     @Override
     protected void finalize() throws Throwable {
     }
+
 
 }

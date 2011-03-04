@@ -109,9 +109,9 @@ public class ClassifierThread extends Thread {
 					false,
 					0,
 					new float[] {
-						Constants.CALIBARATION_ALLOWED_DEVIATION,
-						Constants.CALIBARATION_ALLOWED_DEVIATION,
-						Constants.CALIBARATION_ALLOWED_DEVIATION
+						Constants.CALIBARATION_BASE_ALLOWED_DEVIATION,
+						Constants.CALIBARATION_BASE_ALLOWED_DEVIATION,
+						Constants.CALIBARATION_BASE_ALLOWED_DEVIATION
 					},
 					new float[] {
 						0,
@@ -199,7 +199,6 @@ public class ClassifierThread extends Thread {
 			
 			float[] sd = calibrator.getSd();
 			float[] mean = calibrator.getMean();
-			int count = calibrator.getCount();
 			
 			optionQuery.setCalibrationState(true);
 			optionQuery.setMeanX(mean[Constants.ACCEL_X_AXIS]);
@@ -208,7 +207,7 @@ public class ClassifierThread extends Thread {
 			optionQuery.setStandardDeviationX(sd[Constants.ACCEL_X_AXIS]);
 			optionQuery.setStandardDeviationY(sd[Constants.ACCEL_Y_AXIS]);
 			optionQuery.setStandardDeviationZ(sd[Constants.ACCEL_Z_AXIS]);
-			optionQuery.setCount(count);
+			optionQuery.setCount(calibrator.getCount());
 			optionQuery.setValueOfGravity(calibrator.getValueOfGravity());
 			
 			optionQuery.save();
@@ -219,19 +218,18 @@ public class ClassifierThread extends Thread {
 		String classification = "UNCLASSIFIED/UNKNOWN";
 		
 		//	check the current gravity, rotate and perform classification
-		{			
+		{
+			float gravity = calibrator.getValueOfGravity();
 			float calcGravity = calcSampleStatistics.calcMag(dataMeans);
-			float diffGravity = calcGravity-Constants.GRAVITY;
+			float diffGravity = calcGravity-gravity;
 			if (diffGravity<0.0)
 				diffGravity = -diffGravity;
-			if (diffGravity>Constants.GRAVITY_DEV) {
-				Log.v(Constants.DEBUG_TAG, "Deviation from gravity too large! Found gravity="+calcGravity+", expected gravity="+Constants.GRAVITY);
+			if (diffGravity>gravity*Constants.GRAVITY_DEV) {
+				Log.v(Constants.DEBUG_TAG, "Deviation from gravity too large! Found gravity="+calcGravity+", expected gravity="+gravity);
 				return "";
 			}
 
 			// first rotate samples to world-orientation
-			//	TODO: Gravity and Gravity Deviation values should come from the calibration values,
-			//		which means calibration should be handled in some other way.
 			if (rotateSamples.rotateToWorldCoordinates(dataMeans, data)) {
 				classification = classifier.classifyRotated(data);
 			} else {

@@ -273,7 +273,7 @@ public class ActivityListActivity extends Activity {
 							items = activityQuery.getTodayItemsFromActivityTable();
 							ArrayList<Classification> classification = new ArrayList<Classification>();
 							for(int i=0;i<items.size();i++){
-								classification.add(new Classification("CLASSIFIED/"+items.get(i)[1],dateFormat.parse(items.get(i)[2]).getTime(),dateFormat.parse(items.get(i)[3]).getTime()));
+								classification.add(new Classification(items.get(i)[1],dateFormat.parse(items.get(i)[2]).getTime(),dateFormat.parse(items.get(i)[3]).getTime()));
 
 							}
 
@@ -284,8 +284,8 @@ public class ActivityListActivity extends Activity {
 								if (c!=null)
 									adapter.add(c);
 							}
-							Log.i("countActivityTable","#2"+adapter.getCount());
-							Log.i("countActivityTable","#3"+classification.size());
+							//Log.i("countActivityTable","#2"+adapter.getCount());
+							//Log.i("countActivityTable","#3"+classification.size());
 							isDatabaseDisplayed=true;
 						}
 						
@@ -311,12 +311,20 @@ public class ActivityListActivity extends Activity {
 						String lastActivity = activityQuery.getItemNameFromActivityTable(count);
 						String lastActivityStartDate = activityQuery.getItemStartDateFromActivityTable(count);
 						String lastActivityEndDate = activityQuery.getItemEndDateFromActivityTable(count);
-						SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z"); 
+						SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z");
+						Classification topClassification = null;
+						if (!adapter.isEmpty()) {
+							topClassification = adapter.getItem(0); 
+						}
 
-						if(lastActivity!=null && !adapter.isEmpty() && !adapter.getItem(0).getNiceClassification().equals(lastActivity)){
-
-
-							adapter.insert((new Classification("CLASSIFIED/"+lastActivity,dateFormat.parse(lastActivityStartDate).getTime(),dateFormat.parse(lastActivityEndDate).getTime())).withContext(ActivityListActivity.this),0);
+						if(lastActivity!=null && !topClassification.getClassification().equals(lastActivity)) {
+							Classification lastActivityClass = new Classification(
+									lastActivity,
+									dateFormat.parse(lastActivityStartDate).getTime(),
+									dateFormat.parse(lastActivityEndDate).getTime());
+							lastActivityClass = lastActivityClass.withContext(ActivityListActivity.this);
+							Log.v(Constants.DEBUG_TAG, "Inserting activity: "+lastActivityClass.getNiceClassification()+", prev="+topClassification);
+							adapter.insert(lastActivityClass,0);
 						}else{
 							adapter.getItem(0).updateEnd(dateFormat.parse(lastActivityEndDate).getTime());
 							adapter.notifyDataSetChanged();

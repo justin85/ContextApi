@@ -14,6 +14,7 @@ import activity.classifier.R;
 import activity.classifier.common.Constants;
 import activity.classifier.repository.ActivityQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
+import activity.classifier.rpc.Classification;
 import activity.classifier.service.RecorderService;
 import android.app.Activity;
 import android.content.ComponentName;
@@ -368,8 +369,12 @@ public class ActivityChartActivity extends Activity {
 
 					String newDurationText =getTimeText(newDuration);
 					String beforeDurationText =getTimeText(beforeDuration);
-					String newText = activityQuery.getItemNameFromActivityTable(activitySize);
-					String beforeText = activityQuery.getItemNameFromActivityTable(activitySize-1); 
+					String newText = Classification.getNiceName(
+							ActivityChartActivity.this, 
+							activityQuery.getItemNameFromActivityTable(activitySize));
+					String beforeText = Classification.getNiceName(
+							ActivityChartActivity.this, 
+							activityQuery.getItemNameFromActivityTable(activitySize-1));
 
 					Formatter fmt1 = new Formatter();
 					Formatter fmt2 = new Formatter();

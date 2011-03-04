@@ -120,7 +120,8 @@ public class RotateSamplesToVerticalHorizontal {
 	 */
 	private static void convertToHorVec(float[] inGravityVec, float[] outVec)
 	{
-		int indexSmallest = findIndexOfSmallest(inGravityVec);
+		//int indexSmallest = findIndexOfSmallest(inGravityVec);
+		int indexSmallest = findIndexOfLargest(inGravityVec);
 		
 		if (indexSmallest<0) {
 			throw new RuntimeException("index of the smallest element among "+
@@ -143,6 +144,8 @@ public class RotateSamplesToVerticalHorizontal {
 	
 	/**
 	 * 
+	 * Returns the index of the smallest value in the vector
+	 * 
 	 * @param vector
 	 * The 3 dimensional vector to find the minimum value
 	 * 
@@ -159,6 +162,33 @@ public class RotateSamplesToVerticalHorizontal {
 				temp = -temp;
 			
 			if (temp<value) {
+				value = temp;
+				index = d;
+			}
+		}
+		return index;
+	}
+	
+	/**
+	 * 
+	 * Returns the index of the largest value in the vector
+	 * 
+	 * @param vector
+	 * The 3 dimensional vector to find the minimum value
+	 * 
+	 * @return
+	 * The index of the minimum value in the vector
+	 */
+	private static int findIndexOfLargest(float[] vector) {
+		int index = -1;
+		float value = Float.NEGATIVE_INFINITY;
+		float temp;
+		for (int d=0; d<Constants.ACCEL_DIM; ++d) {
+			temp = vector[d];
+			if (temp<0.0f)
+				temp = -temp;
+			
+			if (temp>value) {
 				value = temp;
 				index = d;
 			}

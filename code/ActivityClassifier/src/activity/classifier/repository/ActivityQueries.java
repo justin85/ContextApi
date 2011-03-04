@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 
+import activity.classifier.common.Constants;
 import android.content.Context;
 import android.database.Cursor;
 import android.util.Log;
@@ -205,19 +206,19 @@ public class ActivityQueries extends Queries{
 		ArrayList<String[]> UNKNOWN = new ArrayList<String[]>();
 
 		for(int i=0;i<items.size();i++){
-			if(items.get(i)[1].equals("Charging")){
+			if(items.get(i)[1].contains("CHARGING")){
 				CHARGING.add(items.get(i));
-			}else if(items.get(i)[1].equals("Uncarried")){
+			}else if(items.get(i)[1].contains("UNCARRIED")){
 				UNCARRIED.add(items.get(i));
-			}else if(items.get(i)[1].equals("Walking")){
+			}else if(items.get(i)[1].contains("WALKING")){
 				WALKING.add(items.get(i));
-			}else if(items.get(i)[1].equals("Travelling")){
+			}else if(items.get(i)[1].contains("TRAVELLING")){
 				TRAVELLING.add(items.get(i));
-			}else if(items.get(i)[1].equals("Paddling")){
+			}else if(items.get(i)[1].contains("PADDLING")){
 				PADDLING.add(items.get(i));
-			}else if(items.get(i)[1].equals("Active")){
+			}else if(items.get(i)[1].contains("ACTIVE")){
 				ACTIVE.add(items.get(i));
-			}else if(items.get(i)[1].equals("Unknown")){
+			}else if(items.get(i)[1].contains("UNKNOWN")){
 				UNKNOWN.add(items.get(i));
 			}else{
 

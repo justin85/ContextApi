@@ -3,6 +3,7 @@ package activity.classifier.utils;
 import activity.classifier.common.Constants;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import android.app.backup.RestoreObserver;
+import android.os.RemoteException;
 import android.util.Log;
 
 /**
@@ -14,11 +15,13 @@ import android.util.Log;
  */
 public class Calibrator {
 	
+	//	values to go back to when calibration is cancelled (i.e. stable values)
 	private int resetCount;
 	private float[] resetSd;
 	private float[] resetMean;
 	private float resetValueOfGravity;
 	
+	//	current values being computed, these values might be changing so aren't stable 
 	private int count;
 	private float[] sd;
 	private float[] mean;
@@ -82,7 +85,14 @@ public class Calibrator {
 		this.isCalibrated = isCalibrated;
 		this.service = service;
 		this.rawDataStatistics = rawDataStatistics;
-		this.measurementsBuffer = new MeasurementsBuffer(20);
+		this.measurementsBuffer = new MeasurementsBuffer(
+				(int)Math.round(
+						//	twice the longest duration we expect to cater for
+						(double)Math.max(Constants.DURATION_OF_CALIBRATION, Constants.DURATION_WAIT_FOR_UNCARRIED)*2.0 /
+						//	divided by the duration of each sample batch
+						(double)Constants.DELAY_SAMPLE_BATCH
+						)
+				);
 		
 		this.count = resetCount;
 		this.mean = resetSd.clone();
@@ -124,20 +134,36 @@ public class Calibrator {
 		isCalibrated = true;
 	}
 	
+	/**
+	 * @return
+	 * The stable mean values
+	 */
 	public float[] getMean() {
-		return mean;
+		return resetMean;
 	}
 
+	/**
+	 * @return
+	 * The stable standard deviation values
+	 */
 	public float[] getSd() {
-		return sd;
+		return resetSd;
 	}
 
+	/**
+	 * @return
+	 * The stable count
+	 */
 	public int getCount() {
-		return count;
+		return resetCount;
 	}
 
+	/**
+	 * @return
+	 * The stable gravity value
+	 */
 	public float getValueOfGravity() {
-		return valueOfGravity;
+		return resetValueOfGravity;
 	}
 
 	public boolean isCalibrated() {
@@ -192,13 +218,13 @@ public class Calibrator {
 	 * @param measurement2
 	 * Second measurement
 	 * 
-	 * @param allowedMeanDiff
+	 * @param baseAllowedMeanDiff
 	 * Allowed difference between the measurements
 	 * 
 	 * @return
 	 * true if movement was detected, false if no movement was detected.
 	 */
-	private boolean hasMovement(Measurement measurement1, Measurement measurement2, float allowedMeanDiff)
+	private boolean hasMovement(Measurement measurement1, Measurement measurement2, float[] baseAllowedMeanDiff, float magnitude)
 	{
 		boolean movementDetected = false;
 		for (int axis=0; axis<Constants.ACCEL_DIM; ++axis) {
@@ -206,7 +232,7 @@ public class Calibrator {
 			if (meanDif<0.0)
 				meanDif = -meanDif;
 			
-			if (meanDif>allowedMeanDiff) {
+			if (meanDif>baseAllowedMeanDiff[axis]*magnitude) {
 				movementDetected = true;
 				break;
 			}
@@ -221,16 +247,16 @@ public class Calibrator {
 	 * @param measurement
 	 * The measurement to check
 	 * 
-	 * @param allowedSdDev
+	 * @param baseAllowedSdDev
 	 * The deviation allowed
 	 * 
 	 * @return
 	 * true if motion was detected, false if no motion was detected.
 	 */
-	private boolean hasMotion(Measurement measurement, float allowedSdDev) {
+	private boolean hasMotion(Measurement measurement, float[] baseAllowedSdDev, float magnitude) {
 		boolean motionDetected = false;
 		for (int axis=0; axis<Constants.ACCEL_DIM; ++axis) {
-			if (measurement.axisSd[axis]>allowedSdDev) {
+			if (measurement.axisSd[axis]>baseAllowedSdDev[axis]*magnitude) {
 				motionDetected = true;
 				break;
 			}
@@ -242,20 +268,20 @@ public class Calibrator {
 	 * Removes items from the filled measurement buffer until an
 	 * item is met that was sampled before the calibration duration.
 	 * 
-	 * @param sampleTime
+	 * @param currentSampleTime
 	 * The current sample time.
 	 * 
 	 * @param duration
 	 * The duration to check.
 	 */
-	private void emptyAllBefore(long sampleTime)
+	private void emptyAllBefore(long currentSampleTime, long duration)
 	{
 		try {
 			//	peek at the last item in the queue
 			Measurement last = measurementsBuffer.peekFilledInstance();
 			while (last!=null) {	//	if an item was found
 				//	check if the item is was taken more than [the calibration waiting period] ago 
-				if (sampleTime-last.time>Constants.DURATION_OF_CALIBRATION) {
+				if (currentSampleTime-last.time>duration) {
 					//	remove item
 					measurementsBuffer.returnEmptyInstance(measurementsBuffer.takeFilledInstance());
 				} else {
@@ -267,7 +293,7 @@ public class Calibrator {
 		} catch (InterruptedException e) {
 			Log.e(Constants.DEBUG_TAG, 
 					"Exception while attempting to find latest measurement " +
-					"taken before the period "+(sampleTime/1000)+"s", 
+					"taken before the period "+(currentSampleTime/1000)+"s", 
 					e);
 		}
 	}
@@ -296,6 +322,8 @@ public class Calibrator {
 	synchronized
 	public void processData(long sampleTime, float[][] data, int size, float[] returnedMeans, float[] returnedSd) throws InterruptedException
 	{
+		//Log.v(Constants.DEBUG_TAG, "Calibration measurement instances left: "+measurementsBuffer.getPendingEmptyInstances());
+		
 		//	assign raw data
 		rawDataStatistics.assign(data, size);
 		
@@ -321,8 +349,7 @@ public class Calibrator {
 		Measurement lastGravity = null;
 		
 		//	check if there is any motion in the current found data
-		//	TODO: Change allowed deviation value to the calibration derived values
-		if (hasMotion(currGravity, Constants.CALIBARATION_ALLOWED_DEVIATION)) {
+		if (hasMotion(currGravity, resetSd, Constants.CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION)) {
 			Log.v(Constants.DEBUG_TAG, "Motion detected in current measurement");
 //			for (int i=0; i<data.length; ++i) {
 //				String s = "";
@@ -342,8 +369,7 @@ public class Calibrator {
 			lastGravity = measurementsBuffer.peekFilledInstance();
 			
 			// check if there is any movement detected
-			//	TODO: Change allowed difference value to the calibration derived values
-			while (lastGravity!=null && hasMovement(lastGravity, currGravity, Constants.CALIBARATION_ALLOWED_DEVIATION)) {
+			while (lastGravity!=null && hasMovement(lastGravity, currGravity, resetSd, Constants.CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION)) {
 				//	get rid of it
 				measurementsBuffer.returnEmptyInstance(measurementsBuffer.takeFilledInstance());
 				//	get the next
@@ -362,12 +388,19 @@ public class Calibrator {
 			//	is the stationary period more than the required stationary period for calibration
 			if (!isCalibrated && sampleTime-lastGravity.time>Constants.DURATION_OF_CALIBRATION) {
 				Log.d(Constants.DEBUG_TAG, "Performing calibration.");
+				try {
+					service.showServiceToast("Performing calibration. Please keep the phone still.");
+				} catch (RemoteException e) {
+				}
+				
 				//	cycle through all the measurements and do calibration
 				int filledCount = measurementsBuffer.getPendingFilledInstances();
 				for (int i=0; i<filledCount; ++i) {
 					Measurement temp = measurementsBuffer.takeFilledInstance();
 					doCalibration(temp.axisMean, temp.axisSd);
-					measurementsBuffer.returnFilledInstance(temp);
+					//	the mean & sd will change after the calibration,
+					//		so don't bother to keep the measurements
+					measurementsBuffer.returnEmptyInstance(temp);
 				}
 				
 				setToCalibratedState();
@@ -377,10 +410,15 @@ public class Calibrator {
 			isUncarried = sampleTime-lastGravity.time>Constants.DURATION_WAIT_FOR_UNCARRIED;
 			
 			//	get rid of extra measurements...
-			emptyAllBefore(Math.max(Constants.DURATION_OF_CALIBRATION, Constants.DURATION_WAIT_FOR_UNCARRIED));
+			emptyAllBefore(sampleTime, Math.max(Constants.DURATION_OF_CALIBRATION, Constants.DURATION_WAIT_FOR_UNCARRIED));
+			
 		} else {
 			Log.d(Constants.DEBUG_TAG, "No stationary period found.");
+			//	set uncarried state
+			isUncarried = false;
 		}
+		
+		measurementsBuffer.assertAllAvailable();
 	}
 	
 	private static class Measurement {

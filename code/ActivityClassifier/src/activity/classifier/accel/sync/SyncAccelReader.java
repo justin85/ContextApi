@@ -20,19 +20,35 @@
  * SOFTWARE.
  */
 
-package activity.classifier.accel;
+package activity.classifier.accel.sync;
 
-import android.content.Context;
+import activity.classifier.accel.SampleBatch;
 
 /**
- * A factory which can produce an appropriate {@link AccelReader}.
- *
+ * Interface implemented by classes which can sample accelerometer data.
+ * 
+ * Edit by Umran:
+ * An synchronous accelerometer reader obtains samples from the accelerometer
+ * at the frequency of the accelerometer. Hence new data is inserted only
+ * when it is available.
+ * 
+ * This the synchronous accelerometer reader is currently not working.
+ * 
  * @author chris
  */
-public class AccelReaderFactory {
+public interface SyncAccelReader {
 
-    public AccelReader getReader(final Context context) {
-        return new RealAccelReader(context);
-    }
+	/**
+	 * 
+	 * @param interSampleDelay
+	 * The delay between samples in ms.
+	 * 
+	 * @param currentBatch
+	 * The batch to save the samples to.
+	 * 
+	 */
+    void startSampling(int interSampleDelay, SampleBatch currentBatch, Runnable finishedRunnable);
+
+    void stopSampling();
 
 }
