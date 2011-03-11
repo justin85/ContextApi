@@ -41,9 +41,11 @@ import activity.classifier.accel.sync.SyncAccelReaderFactory;
 import activity.classifier.accel.sync.SyncSampler;
 import activity.classifier.aggregator.Aggregator;
 import activity.classifier.common.Constants;
+import activity.classifier.common.ExceptionHandler;
 import activity.classifier.model.ModelReader;
 import activity.classifier.repository.ActivityQueries;
 import activity.classifier.repository.OptionQueries;
+import activity.classifier.repository.TestAVQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.rpc.Classification;
 import activity.classifier.service.threads.AccountThread;
@@ -106,6 +108,7 @@ public class RecorderService extends Service implements Runnable {
 
 	private OptionQueries optionQuery;
 	private ActivityQueries activityQuery;
+	private TestAVQueries testavQueries;
 
 	private boolean running;
 
@@ -237,9 +240,9 @@ public class RecorderService extends Service implements Runnable {
 			return mainLooperHandler;
 		}
 		
-		public void submitClassification(String classification) throws RemoteException {
+		public void submitClassification(long sampleTime, String classification) throws RemoteException {
 			Log.i(Constants.DEBUG_TAG, "Recorder Service: Received classification: '" + classification + "'");
-			updateScores(classification);
+			updateScores(sampleTime, classification);
 		}
 
 		public List<Classification> getClassifications() throws RemoteException {
@@ -347,7 +350,7 @@ public class RecorderService extends Service implements Runnable {
 			if(activity!=null && !lastAc.equals(activity)){
 				Log.i("classification",activity);
 				int count = activityQuery.getSizeOfTable();
-				if(count>0 && !activityQuery.getItemNameFromActivityTable(count).equals("END")){
+				if(count>0 && !ActivityQueries.ACTIVITY_END.equals(activityQuery.getItemNameFromActivityTable(count))){
 					activityQuery.updateNewItems(count, startDate);
 				}
 				activityQuery.insertActivities(activity, startDate, 0);
@@ -364,24 +367,31 @@ public class RecorderService extends Service implements Runnable {
 		
 	}
 	
-	private void updateScores(final String newClassification) {
+	private void updateScores(long sampleTime, String newClassification) {
 		
-		// TODO: Change this before commit
-//		aggregator.addClassification(newClassification);
-//		String aggrClassification = aggregator.getClassification();
-//		if (aggrClassification!=null && !aggrClassification.equals("CLASSIFIED/WAITING")) {
-//			final String best = aggrClassification;
-//			
-//			if (!classifications.isEmpty()
-//					&& best.equals(classifications.get(classifications.size() - 1).getClassification())) {
-//				classifications.get(classifications.size() - 1).updateEnd(	System.currentTimeMillis());
-//			} else {
-//				classifications.add(new Classification(best, System.currentTimeMillis()));
-//			}
-//		}
+		String best = "";
 		
-		final String best = newClassification;
-		classifications.add(new Classification(best, System.currentTimeMillis()));
+		if (optionQuery.getUseAggregator()) {
+			aggregator.addClassification(newClassification);
+			String aggrClassification = aggregator.getClassification();
+			if (aggrClassification!=null && !ActivityQueries.isSystemActivity(aggrClassification)) {
+				best = aggrClassification;
+				
+				if (!classifications.isEmpty()
+						&& best.equals(classifications.get(classifications.size() - 1).getClassification())) {
+					classifications.get(classifications.size() - 1).updateEnd(System.currentTimeMillis());
+				} else {
+					classifications.add(new Classification(best, System.currentTimeMillis()));
+				}
+			}
+		} else {
+			best = newClassification;
+			classifications.add(new Classification(best, System.currentTimeMillis()));
+		}
+		
+		if (Constants.OUTPUT_DEBUG_INFO) {
+			testavQueries.updateFinalClassification(sampleTime, best);
+		}
 		
 		try {
 			insertNewActivity();
@@ -402,6 +412,9 @@ public class RecorderService extends Service implements Runnable {
 	public void onCreate() {
 		super.onCreate();
 
+		//set exception handler
+		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
+
 		Log.v(Constants.DEBUG_TAG, "RecorderService.onCreate()");
 	}
 	
@@ -416,7 +429,7 @@ public class RecorderService extends Service implements Runnable {
 		
 		//	all the initialization code that was here,
 		//		has been moved to the run() function		
-		(new Thread(this)).start();
+		(new Thread(this, RecorderService.class.getName()+"-Thread")).start();
 		running = true;
 	}
 
@@ -480,8 +493,11 @@ public class RecorderService extends Service implements Runnable {
 		phoneInfo = new PhoneInfo(this);
 		activityQuery = new ActivityQueries(this);
 		optionQuery = new OptionQueries(this);
-		optionQuery.load();
+		testavQueries = new TestAVQueries(this);
 		batchBuffer = new SampleBatchBuffer();
+		
+		//	load options from DB
+		optionQuery.load();
 		
 //		optionQuery.setServiceRunningState(true);
 		applyWakeLock(optionQuery.isWakeLockSet());
@@ -495,15 +511,14 @@ public class RecorderService extends Service implements Runnable {
         Log.i("countActivityTable","#"+count);
         if(count > 0){
 	    	String lastActivity = activityQuery.getItemNameFromActivityTable(count);
-	    	if(!lastActivity.equals("END")){
+	    	if(!ActivityQueries.ACTIVITY_END.equals(lastActivity)){
 	    		String endDate = activityQuery.getItemEndDateFromActivityTable(count);
 	    		
-	    		activityQuery.insertActivities("END", endDate, 0);
+	    		activityQuery.insertActivities(ActivityQueries.ACTIVITY_END, endDate, 0);
 	    	}
         }else if (count==0){
         	Date date = new Date();
-        	SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z"); 
-        	activityQuery.insertActivities("END", dateFormat.format(date), 0);
+        	activityQuery.insertActivities(ActivityQueries.ACTIVITY_END, Constants.DB_DATE_FORMAT.format(date), 0);
         }
         
         AsyncAccelReader reader = new AsyncAccelReaderFactory().getReader(this);
@@ -517,7 +532,6 @@ public class RecorderService extends Service implements Runnable {
 		
 		// if the account wasn't previously sent,
 		// start a thread to register the account.
-		optionQuery.load();
 		if (!optionQuery.isAccountSent()) {
 			registerAccountThread = new AccountThread(this, binder, phoneInfo, optionQuery);
 			registerAccountThread.start();
@@ -537,6 +551,9 @@ public class RecorderService extends Service implements Runnable {
 		// System.currentTimeMillis()));
 		// classifications.add(new Classification("",
 		// System.currentTimeMillis()));		
+		optionQuery.load();
+		optionQuery.setServiceStartedState(true);
+		optionQuery.save();
 	}
 
 	/**
@@ -563,9 +580,7 @@ public class RecorderService extends Service implements Runnable {
 		
 		// save message "END" to recognise when the background service is
 		// finished.
-		activityQuery.insertActivities("END", startTime, 0);
-		optionQuery.setServiceRunningState(false);
-		optionQuery.save();
+		activityQuery.insertActivities(ActivityQueries.ACTIVITY_END, startTime, 0);
 		MainTabActivity.serviceIsRunning = false;
 		
 		this.unregisterReceiver(myBatteryReceiver);

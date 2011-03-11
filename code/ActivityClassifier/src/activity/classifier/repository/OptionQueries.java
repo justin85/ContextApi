@@ -1,6 +1,8 @@
 package activity.classifier.repository;
 
+import activity.classifier.common.Constants;
 import android.content.Context;
+import android.util.Log;
 
 /**
  * A utility class which extends superclass {@link Queries} 
@@ -15,10 +17,20 @@ import android.content.Context;
  *
  */
 public class OptionQueries extends Queries {
+	
+	private static OptionQueries optionQueries = null;
+	
+	synchronized
+	public static OptionQueries getOptionQueries(Context context) {
+		if (optionQueries==null)
+			optionQueries = new OptionQueries(context);
+		return optionQueries;
+	}
+	
 
 	private DbAdapter dbAdapter;
 	
-	private boolean isServiceRunning;
+	private boolean isServiceStarted;
 	private boolean isCalibrated;
 	private boolean isAccountSent;
 	private boolean isWakeLockSet;
@@ -26,6 +38,8 @@ public class OptionQueries extends Queries {
 	private float[] standardDeviation = new float[3];
 	private float[] mean = new float[3];
 	private int count;
+	private boolean useAggregator;
+	private float allowedMultiplesOfDeviation;
 	
 	/**
 	 * @see Queries
@@ -46,7 +60,7 @@ public class OptionQueries extends Queries {
 
 	
 	public synchronized void load(){
-		int isServiceRunning;
+		int isServiceStarted;
 		int isCalibrated;
 		float valueOfGravity;
 		int isAccountSent;
@@ -54,64 +68,58 @@ public class OptionQueries extends Queries {
 		float[] standardDeviation = new float[3];
 		float[] mean = new float[3];
 		int count;
+		int useAggregator;
+		float allowedMultiplesOfDeviation;
 		
 		dbAdapter.open();
-		isServiceRunning = dbAdapter.fetchFromStartTableInt("isServiceRunning");
-		isCalibrated = dbAdapter.fetchFromStartTableInt("isCalibrated");
-		valueOfGravity = dbAdapter.fetchFromStartTableFloat("valueOfGravity");
-		isAccountSent = dbAdapter.fetchFromStartTableInt("isAccountSent");
-		isWakeLockSet = dbAdapter.fetchFromStartTableInt("isWakeLockSet");
-		standardDeviation[0] = dbAdapter.fetchFromStartTableFloat("sdX");
-		standardDeviation[1] = dbAdapter.fetchFromStartTableFloat("sdY");
-		standardDeviation[2] = dbAdapter.fetchFromStartTableFloat("sdZ");
-		mean[0] = dbAdapter.fetchFromStartTableFloat("meanX");
-		mean[1] = dbAdapter.fetchFromStartTableFloat("meanY");
-		mean[2] = dbAdapter.fetchFromStartTableFloat("meanZ");
-		count = dbAdapter.fetchFromStartTableInt("count");
+		isServiceStarted = dbAdapter.fetchFromStartTableInt(DbAdapter.KEY_IS_SERVICE_STARTED);
+		isCalibrated = dbAdapter.fetchFromStartTableInt(DbAdapter.KEY_IS_CALIBRATED);
+		valueOfGravity = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_VALUE_OF_GRAVITY);
+		isAccountSent = dbAdapter.fetchFromStartTableInt(DbAdapter.KEY_IS_ACCOUNT_SENT);
+		isWakeLockSet = dbAdapter.fetchFromStartTableInt(DbAdapter.KEY_IS_WAKE_LOCK_SET);
+		standardDeviation[0] = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_SD_X);
+		standardDeviation[1] = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_SD_Y);
+		standardDeviation[2] = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_SD_Z);
+		mean[0] = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_MEAN_X);
+		mean[1] = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_MEAN_Y);
+		mean[2] = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_MEAN_Z);
+		count = dbAdapter.fetchFromStartTableInt(DbAdapter.KEY_COUNT);
+		useAggregator = dbAdapter.fetchFromStartTableInt(DbAdapter.KEY_USE_AGGREGATOR);
+		allowedMultiplesOfDeviation = dbAdapter.fetchFromStartTableFloat(DbAdapter.KEY_ALLOWED_MULTIPLES_OF_SD);
 		dbAdapter.close();
 		
-		if(isServiceRunning==0){
-			this.isServiceRunning = false;
-		}else if(isServiceRunning==1){
-			this.isServiceRunning = true;
-		}
-		if(isCalibrated==0){
-			this.isCalibrated = false;
-		}else if(isCalibrated==1){
-			this.isCalibrated = true;
-		}
-		if(isAccountSent==0){
-			this.isAccountSent = false;
-		}else if(isAccountSent==1){
-			this.isAccountSent = true;
-		}
-		if(isWakeLockSet==0){
-			this.isWakeLockSet = false;
-		}else if(isWakeLockSet==1){
-			this.isWakeLockSet = true;
-		}
+		this.isServiceStarted = isServiceStarted!=0;
+		this.isCalibrated = isCalibrated!=0;
+		this.isAccountSent = isAccountSent!=0;
+		this.isWakeLockSet = isWakeLockSet!=0;
+		
 		for(int i = 0; i < 3; i++){
 			this.standardDeviation[i] = standardDeviation[i];
 			this.mean[i] = mean[i];
 		}
+		
 		this.count = count;
 		this.valueOfGravity = valueOfGravity;
+		this.useAggregator = useAggregator!=0;
+		this.allowedMultiplesOfDeviation = allowedMultiplesOfDeviation;
 	}
 
 	public synchronized void save(){
 		dbAdapter.open();
-		dbAdapter.updateToSelectedStartTable("isServiceRunning", this.isServiceRunning?"1":"0");
-		dbAdapter.updateToSelectedStartTable("isCalibrated", this.isCalibrated?"1":"0");
-		dbAdapter.updateToSelectedStartTable("isAccountSent", this.isAccountSent?"1":"0");
-		dbAdapter.updateToSelectedStartTable("isWakeLockSet", this.isWakeLockSet?"1":"0");
-		dbAdapter.updateToSelectedStartTable("valueOfGravity", Float.toString(this.valueOfGravity));
-		dbAdapter.updateToSelectedStartTable("sdX", Float.toString(this.standardDeviation[0]));
-		dbAdapter.updateToSelectedStartTable("sdY", Float.toString(this.standardDeviation[1]));
-		dbAdapter.updateToSelectedStartTable("sdZ", Float.toString(this.standardDeviation[2]));
-		dbAdapter.updateToSelectedStartTable("meanX", Float.toString(this.mean[0]));
-		dbAdapter.updateToSelectedStartTable("meanY", Float.toString(this.mean[1]));
-		dbAdapter.updateToSelectedStartTable("meanZ", Float.toString(this.mean[2]));
-		dbAdapter.updateToSelectedStartTable("count", Integer.toString(count));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_IS_SERVICE_STARTED, this.isServiceStarted?"1":"0");
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_IS_CALIBRATED, this.isCalibrated?"1":"0");
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_IS_ACCOUNT_SENT, this.isAccountSent?"1":"0");
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_IS_WAKE_LOCK_SET, this.isWakeLockSet?"1":"0");
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_VALUE_OF_GRAVITY, Float.toString(this.valueOfGravity));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_SD_X, Float.toString(this.standardDeviation[0]));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_SD_Y, Float.toString(this.standardDeviation[1]));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_SD_Z, Float.toString(this.standardDeviation[2]));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_MEAN_X, Float.toString(this.mean[0]));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_MEAN_Y, Float.toString(this.mean[1]));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_MEAN_Z, Float.toString(this.mean[2]));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_COUNT, Integer.toString(count));
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_USE_AGGREGATOR, this.useAggregator?"1":"0");
+		dbAdapter.updateToSelectedStartTable(DbAdapter.KEY_ALLOWED_MULTIPLES_OF_SD, Float.toString(allowedMultiplesOfDeviation));
 		dbAdapter.close();
 	}
 	
@@ -120,16 +128,16 @@ public class OptionQueries extends Queries {
 	 * Set the background service running state
 	 * @param value should be 1 if service is running, 0 otherwise.
 	 */
-	public synchronized void setServiceRunningState(boolean value){
-		this.isServiceRunning = value;
+	public synchronized void setServiceStartedState(boolean value){
+		this.isServiceStarted = value;
 	}
 	
 	/**
-	 * Get the background service running state
+	 * Get whether the background service was started previously or not
 	 * @return 1 if service is running, 0 otherwise.
 	 */
-	public synchronized boolean getServiceRunningState(){
-		return this.isServiceRunning;
+	public synchronized boolean getServiceStartedState(){
+		return this.isServiceStarted;
 	}
 
 	/**
@@ -308,5 +316,38 @@ public class OptionQueries extends Queries {
 	 */
 	public synchronized boolean isWakeLockSet(){
 		return this.isWakeLockSet;
+	}
+
+
+	/**
+	 * @return whether to use the aggregator or not
+	 */
+	public boolean getUseAggregator() {
+		return useAggregator;
+	}
+
+
+	/**
+	 * @param useAggregator
+	 * whether to use the aggregator or not
+	 */
+	public void setUseAggregator(boolean useAggregator) {
+		this.useAggregator = useAggregator;
+	}
+
+
+	/**
+	 * @return the allowed Multiples Of Deviation
+	 */
+	public float getAllowedMultiplesOfDeviation() {
+		return allowedMultiplesOfDeviation;
+	}
+
+
+	/**
+	 * @param allowedMultiplesOfDeviation the allowed Multiples Of Deviation to set
+	 */
+	public void setAllowedMultiplesOfDeviation(float allowedMultiplesOfDeviation) {
+		this.allowedMultiplesOfDeviation = allowedMultiplesOfDeviation;
 	}
 }

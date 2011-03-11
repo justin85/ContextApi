@@ -17,7 +17,7 @@ if you want to use the service properly.
     <string name="app_service_enabled">Stop Service</string>
     <string name="app_service_disabled">Start Service</string>
 
-    <string name="activity_unclassified_unknown">Unknown</string>
+    <string name="activity_unknown">Unknown</string>
     <string name="activity_classified_charging">Charging</string>
      <string name="activity_classified_end">END</string>
     <string name="activity_classified_uncarried">Uncarried</string>

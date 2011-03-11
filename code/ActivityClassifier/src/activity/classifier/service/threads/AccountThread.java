@@ -58,6 +58,7 @@ public class AccountThread extends Thread {
 	private boolean shouldExit;
 
     public AccountThread(Context context, ActivityRecorderBinder service, PhoneInfo phoneInfo, OptionQueries optionQueries) {
+    	super(AccountThread.class.getName());
     	this.context = context;
     	this.service = service;
     	this.phoneInfo = phoneInfo;
@@ -108,11 +109,15 @@ public class AccountThread extends Thread {
     	
     	if (accountName!=null){
     		
+    		Log.v(Constants.DEBUG_TAG, "Account thread attempting to upload account details.");
+    		
 			HttpClient client = new DefaultHttpClient();
 			final HttpPost post = new HttpPost(Constants.URL_USER_DETAILS_POST);
 			final File file = context.getFileStreamPath(Constants.RECORDS_FILE_NAME);
 			final FileEntity entity = new FileEntity(file, "text/plain");
 
+			optionQueries.load();
+			
 			//post user's information
 			try {
 				post.setHeader("UID",accountName);

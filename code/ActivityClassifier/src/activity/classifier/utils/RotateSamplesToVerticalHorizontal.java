@@ -110,7 +110,11 @@ public class RotateSamplesToVerticalHorizontal {
 		}
 	}
 	
+	private static float[] normalizedGravity = new float[Constants.ACCEL_DIM];
+	
 	/**
+	 * 
+	 * Source: <a>http://stackoverflow.com/questions/2096474/given-a-surface-normal-find-rotation-for-3d-plane</a>
 	 * 
 	 * @param inGravityVec
 	 * the gravity vector(3 dimensions) to convert to a horizontal vector
@@ -118,28 +122,30 @@ public class RotateSamplesToVerticalHorizontal {
 	 * @param outVec
 	 * an array of 3 floats to save the final horizontal vector in
 	 */
+	synchronized
 	private static void convertToHorVec(float[] inGravityVec, float[] outVec)
 	{
-		//int indexSmallest = findIndexOfSmallest(inGravityVec);
-		int indexSmallest = findIndexOfLargest(inGravityVec);
-		
-		if (indexSmallest<0) {
-			throw new RuntimeException("index of the smallest element among "+
-			                           vec2str(inGravityVec)+" couldn't be found!");
+		for (int i=0; i<Constants.ACCEL_DIM; ++i) {
+			normalizedGravity[i] = inGravityVec[i];
+			outVec[i] = 0.0f;
 		}
 		
-		//	assign the smallest to the first value of the vector (x)
-		outVec[Constants.ACCEL_X_AXIS] = inGravityVec[indexSmallest];
-		//	assign the other two to the other two values (y and z)
-		int ddst = Constants.ACCEL_Y_AXIS; 
-		for (int dsrc=0; dsrc<Constants.ACCEL_DIM; ++dsrc)
-			if (dsrc!=indexSmallest) {
-				outVec[ddst] = inGravityVec[dsrc];
-				++ddst;
-			}
+		//	normalize gravity vector
+		CalcStatistics.normalize(Constants.ACCEL_DIM, normalizedGravity);
 		
-		//	negate either y or z
-		outVec[Constants.ACCEL_Y_AXIS] = -outVec[Constants.ACCEL_Y_AXIS];
+		//	get the minimum axis
+        int imin = 0;
+		for (int i=0; i<Constants.ACCEL_DIM; ++i)
+            if(normalizedGravity[i] < normalizedGravity[imin])
+                imin = i;
+
+        //	get the scaling value
+        float dt = normalizedGravity[imin];
+
+        //	subtract the scaled value from the unit vector of the minimum axis
+        outVec[imin] = 1;
+		for (int i=0; i<Constants.ACCEL_DIM; ++i)
+        	outVec[i] -= dt*normalizedGravity[i];
 	}
 	
 	/**

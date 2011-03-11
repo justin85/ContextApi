@@ -81,8 +81,6 @@ public class ActivityChartActivity extends Activity {
 
 		public void onServiceDisconnected(ComponentName componentName) {
 			service = null;
-
-			Log.i(Constants.DEBUG_TAG, "Service Disconnected");
 		}
 
 
@@ -136,8 +134,7 @@ public class ActivityChartActivity extends Activity {
 		FlurryAgent.onEndSession(this);
 	}
 
-	private void setTimeDuration(int ACTIVITY) throws ParseException{
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z"); 
+	private void setTimeDuration(int ACTIVITY) throws ParseException{ 
 		long tempDurationToay=0;
 		long tempDurationHour=0;
 		long tempDuration4Hours=0;
@@ -148,8 +145,8 @@ public class ActivityChartActivity extends Activity {
 		//		Log.i("duration",fourHourTime+"");
 		//		Log.i("duration",hourTime+"");
 		for(int j=0;j<activityGroup.get(ACTIVITY).size();j++){
-			long startDate = dateFormat.parse(activityGroup.get(ACTIVITY).get(j)[2]).getTime();
-			long endDate = dateFormat.parse(activityGroup.get(ACTIVITY).get(j)[3]).getTime();
+			long startDate = Constants.DB_DATE_FORMAT.parse(activityGroup.get(ACTIVITY).get(j)[2]).getTime();
+			long endDate = Constants.DB_DATE_FORMAT.parse(activityGroup.get(ACTIVITY).get(j)[3]).getTime();
 
 			tempDurationToay+=((endDate-startDate)/1000);
 			long fourHourAgo = fourHourTime.getTime();
@@ -246,21 +243,22 @@ public class ActivityChartActivity extends Activity {
 	}
 	private class UpdateInterfaceRunnable implements Runnable {
 
-		//	save the state of the service, if it was previously running or not
-		//		to avoid unnecessary updates
-		private boolean prevServiceRunning = false;
-
 		//	avoids conflicts between scheduled updates,
 		//		and once-off updates 
 		private ReentrantLock reentrantLock = new ReentrantLock();
+		
+		//	last update time
+		private long lastUpdateTime = 0;
 
 		//	starts scheduled interface updates
 		public void start() {
+			Log.v(Constants.DEBUG_TAG, "UpdateInterfaceRunnable started");
 			handler.postDelayed(updateInterfaceRunnable, 1);
 		}
 
 		//	stops scheduled interface updates
 		public void stop() {
+			Log.v(Constants.DEBUG_TAG, "UpdateInterfaceRunnable stopped");
 			handler.removeCallbacks(updateInterfaceRunnable);
 		}
 
@@ -282,33 +280,17 @@ public class ActivityChartActivity extends Activity {
 		}
 
 		public void run() {
-			try {
-				if(service!=null){
-					if(service.isRunning()){
-						if (reentrantLock.tryLock()) {
-
-							try {
-
-								updateUI();
-
-							} catch (ParseException e) {
-								e.printStackTrace();
-							}
-
-							reentrantLock.unlock();
-						}
-						handler.postDelayed(updateInterfaceRunnable, Constants.DELAY_UI_GRAPHIC_UPDATE);
-					}else{
-						handler.postDelayed(updateInterfaceRunnable, 500);
-					}
-				}else{
-
-					handler.postDelayed(updateInterfaceRunnable, 500);
+			if (reentrantLock.tryLock()) {
+				
+				try {
+					updateUI();
+				} catch (ParseException e) {
+					e.printStackTrace();
 				}
-			} catch (RemoteException e) {
-				e.printStackTrace();
-			}
 
+				reentrantLock.unlock();
+			}
+			handler.postDelayed(updateInterfaceRunnable, Constants.DELAY_UI_GRAPHIC_UPDATE);
 		}
 
 		private String getTimeText(long duration){
@@ -346,54 +328,79 @@ public class ActivityChartActivity extends Activity {
 		 */
 		@SuppressWarnings("unchecked")
 		private void updateUI() throws ParseException {
-			try {
-				boolean isServiceRunning = service!=null && service.isRunning();
-
-				int activitySize = activityQuery.getSizeOfTable();
-				Log.i("time",activitySize+"");
-
-				//	update list either if service state has changed, or it's still running
-				if ((isServiceRunning!=prevServiceRunning || isServiceRunning ) && activitySize>1) {
-					Log.i("time","start");
-					updateTimeDuration();
-					//					Log.i("duration"," "+todayDuration.get(0));						
-					//					update.setRunningState(true);
-					SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z"); 
-
-					String newActivityStartDate = activityQuery.getItemStartDateFromActivityTable(activitySize);
-					String newActivityEndDate = activityQuery.getItemEndDateFromActivityTable(activitySize);
-					long newDuration = (dateFormat.parse(newActivityEndDate).getTime()-dateFormat.parse(newActivityStartDate).getTime())/1000;
-					String beforeActivityStartDate = activityQuery.getItemStartDateFromActivityTable(activitySize-1);
-					String beforeActivityEndDate = activityQuery.getItemEndDateFromActivityTable(activitySize-1);
-					long beforeDuration = (dateFormat.parse(beforeActivityEndDate).getTime()-dateFormat.parse(beforeActivityStartDate).getTime())/1000;
-
-					String newDurationText =getTimeText(newDuration);
-					String beforeDurationText =getTimeText(beforeDuration);
-					String newText = Classification.getNiceName(
-							ActivityChartActivity.this, 
-							activityQuery.getItemNameFromActivityTable(activitySize));
-					String beforeText = Classification.getNiceName(
-							ActivityChartActivity.this, 
-							activityQuery.getItemNameFromActivityTable(activitySize-1));
-
-					Formatter fmt1 = new Formatter();
-					Formatter fmt2 = new Formatter();
-					String newNiceText = fmt1.format("%1$-10s", newText).toString();
-					String beforeNiceText =  fmt2.format("%1$-10s", beforeText).toString();
-
-					textView1.setText(" Now    : " + newNiceText +" "+newDurationText );
-					textView2.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
-					textView3.setText(" Now    : " + newNiceText +" "+newDurationText);
-					textView4.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
-
-					flipper.startFlipping();
-					flipper.stopFlipping();
-				}
-				chartview.postInvalidate();
-				prevServiceRunning = isServiceRunning;
-			} catch (RemoteException ex) {
-				Log.e(Constants.DEBUG_TAG, "Error while updating user interface", ex);
+			
+			//	please note:
+			//		In the nexus s (not sure about other phones), there seems to be
+			//		two events that occur about 5 seconds apart, even though
+			//		its the same handler, and the sequence is started only once.
+			//		You can use this code to check the stack trace.
+			//
+			//				try {
+			//					throw new RuntimeException();
+			//				} catch (Exception e) {
+			//					Log.v(Constants.DEBUG_TAG, "Update Chart UI Exception", e);
+			//				}
+			//
+			//		To avoid this, we make sure that the last call was at least
+			//		the required interval ago.
+			
+			long currentTime = System.currentTimeMillis();
+			if (currentTime-lastUpdateTime<Constants.DELAY_UI_GRAPHIC_UPDATE) {
+				//	avoid refreshing before the required time
+				return;
+			} else {
+				lastUpdateTime = currentTime;
 			}
+			
+			Log.v(Constants.DEBUG_TAG, "Update Chart UI");
+			
+			
+			int activitySize = activityQuery.getSizeOfTable();
+			Log.i("time",activitySize+"");
+
+			//	update list either if service state has changed, or it's still running
+			Log.i("time","start");
+			updateTimeDuration();
+			//					Log.i("duration"," "+todayDuration.get(0));						
+			//					update.setRunningState(true);
+			String newActivityStartDate = activityQuery.getItemStartDateFromActivityTable(activitySize);
+			String newActivityEndDate = activityQuery.getItemEndDateFromActivityTable(activitySize);
+			long newDuration = (Constants.DB_DATE_FORMAT.parse(newActivityEndDate).getTime()-Constants.DB_DATE_FORMAT.parse(newActivityStartDate).getTime())/1000;
+			String beforeActivityStartDate = activityQuery.getItemStartDateFromActivityTable(activitySize-1);
+			String beforeActivityEndDate = activityQuery.getItemEndDateFromActivityTable(activitySize-1);
+			long beforeDuration = (Constants.DB_DATE_FORMAT.parse(beforeActivityEndDate).getTime()-Constants.DB_DATE_FORMAT.parse(beforeActivityStartDate).getTime())/1000;
+
+			String newActivityName = activityQuery.getItemNameFromActivityTable(activitySize);
+			String beforeActivityName = activityQuery.getItemNameFromActivityTable(activitySize-1);
+			
+			String newDurationText = "";
+			String beforeDurationText = "";
+			
+			String newText = "";
+			String beforeText = "";
+			
+			if (!ActivityQueries.isSystemActivity(newActivityName)) {
+				newText = Classification.getNiceName(ActivityChartActivity.this, newActivityName);
+				newDurationText = getTimeText(newDuration);
+			}
+			
+			if (!ActivityQueries.isSystemActivity(beforeActivityName)) {
+				beforeText = Classification.getNiceName(ActivityChartActivity.this, beforeActivityName);
+				beforeDurationText = getTimeText(beforeDuration);
+			}
+
+			String newNiceText = String.format("%1$-10s", newText).toString();
+			String beforeNiceText = String.format("%1$-10s", beforeText).toString();
+
+			textView1.setText(" Now    : " + newNiceText +" "+newDurationText );
+			textView2.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
+			textView3.setText(" Now    : " + newNiceText +" "+newDurationText);
+			textView4.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
+
+			flipper.startFlipping();
+			flipper.stopFlipping();
+			
+			chartview.postInvalidate();
 		}
 
 	}

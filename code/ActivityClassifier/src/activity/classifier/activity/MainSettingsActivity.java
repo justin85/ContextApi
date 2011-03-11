@@ -42,6 +42,8 @@ public class MainSettingsActivity extends PreferenceActivity {
 	private boolean wakelock;
 
 	private OptionQueries optionQuery;
+	
+	private CheckBoxPreference aggregatePref;
 
 	/**
 	 * When the Service connection is established in this class,
@@ -78,7 +80,8 @@ public class MainSettingsActivity extends PreferenceActivity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		optionQuery = new OptionQueries(this);
-		init();
+		optionQuery.load();
+		
 		wakelock=false;
 		Intent intent = new Intent(this, RecorderService.class);
 		if(!getApplicationContext().bindService(intent, connection, Context.BIND_AUTO_CREATE)){
@@ -87,14 +90,13 @@ public class MainSettingsActivity extends PreferenceActivity {
 		Log.i("isrunning",connection+"");
 		Log.i("isrunning","Createy "+service+"");
 		setPreferenceScreen(createPreferenceHierarchy());
-
-
 	}
 	/**
 	 * 
 	 */
 	protected void onResume() {
 		super.onResume();
+		optionQuery.load();
 		Log.i("isrunning","Resume "+service+"");
 		if(service!=null)
 			try {
@@ -102,6 +104,8 @@ public class MainSettingsActivity extends PreferenceActivity {
 			} catch (RemoteException e) {
 				e.printStackTrace();
 			}
+			
+		aggregatePref.setChecked(optionQuery.getUseAggregator());
 	}
 
 	/**
@@ -109,6 +113,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 	 */
 	protected void onPause() {
 		super.onPause();
+		optionQuery.save();
 		Log.i("isrunning","Pause "+service+"");
 		if(service!=null)
 			try {
@@ -154,9 +159,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 	public IBinder onBind(Intent intent) {
 		return null;
 	}
-	private void init(){
-		this.optionQuery.load();
-	}
+	
 	private PreferenceScreen createPreferenceHierarchy() {
 		
 		PreferenceScreen root = getPreferenceManager().createPreferenceScreen(this);
@@ -178,8 +181,8 @@ public class MainSettingsActivity extends PreferenceActivity {
 		Log.i("wake",wakelock+"");
 		screenPref.setChecked(wakelock);  
 		Log.i("wake",screenPref.isChecked()+"");
-		getApplicationContext().bindService(new Intent(this, RecorderService.class),
-				connection, Context.BIND_AUTO_CREATE);
+//		getApplicationContext().bindService(new Intent(this, RecorderService.class),
+//				connection, Context.BIND_AUTO_CREATE);
 
 		screenPref.setOnPreferenceChangeListener(new CheckBoxPreference.OnPreferenceChangeListener(){
 
@@ -271,19 +274,16 @@ public class MainSettingsActivity extends PreferenceActivity {
 		copyPref.setOnPreferenceClickListener(new PreferenceScreen.OnPreferenceClickListener(){
 
 			public boolean onPreferenceClick(Preference preference) {
-				File sdcard = Environment.getExternalStorageDirectory();
-				File dbpath = new File(sdcard.getAbsolutePath() + File.separator
-						+ "activityclassfier");
-				if (!dbpath.exists()) {
+				File dbfile = new File(Constants.PATH_SD_CARD_DUMP_DB);
+				File dbPathParent = dbfile.getParentFile();
+				if (dbPathParent!=null && !dbPathParent.exists()) {
 					if (true)
-						Log.d(Constants.DEBUG_TAG, "Create DB directory. " + dbpath.getAbsolutePath());
-					dbpath.mkdirs();
+						Log.d(Constants.DEBUG_TAG, "Create DB directory. " + dbPathParent.getAbsolutePath());
+					dbPathParent.mkdirs();
 				}
 
-				String dbfile = dbpath.getAbsolutePath() + File.separator
-				+ "activityrecords.db";
-				copy(Constants.PATH_ACTIVITY_RECORDS_DB, dbfile);
-				Toast.makeText(getBaseContext(), "Database copied into " + dbpath.getAbsolutePath()+"/ directory.", Toast.LENGTH_LONG).show();
+				copy(new File(Constants.PATH_ACTIVITY_RECORDS_DB), dbfile);
+				Toast.makeText(getBaseContext(), "Database copied into " + dbfile.getAbsolutePath(), Toast.LENGTH_LONG).show();
 
 				return false;
 			}
@@ -291,7 +291,30 @@ public class MainSettingsActivity extends PreferenceActivity {
 		});
 		filePrefCat.addPreference(copyPref);
 
+		if (Constants.IS_DEV_VERSION) {
+			PreferenceCategory developerPrefCat = new PreferenceCategory(this);
+			developerPrefCat.setTitle("Developer Settings");
+	
+			aggregatePref = new CheckBoxPreference(this);
+			aggregatePref.setKey("aggregate_preference");
+			aggregatePref.setTitle("Aggregate Activities");
+			aggregatePref.setSummary("Smoothen activity classification\n(requires service restart)");
+			aggregatePref.setOnPreferenceChangeListener(new CheckBoxPreference.OnPreferenceChangeListener(){
+	
+				public boolean onPreferenceChange(Preference arg0, Object arg1) {
+					boolean checked = (Boolean) arg1; 
+					optionQuery.setUseAggregator(checked);
+					optionQuery.save();
+					aggregatePref.setChecked(checked);
+					return false;
+				}
+	
+			});
+			aggregatePref.setChecked(optionQuery.getUseAggregator());
 
+			root.addPreference(developerPrefCat);
+			developerPrefCat.addPreference(aggregatePref);
+		}
 
 		return root;
 	}
@@ -339,9 +362,9 @@ public class MainSettingsActivity extends PreferenceActivity {
 				public void onClick(DialogInterface dialog, int whichButton) {
 					optionQuery.setCalibrationState(false);
 					optionQuery.setValueOfGravity(Constants.GRAVITY);
-					optionQuery.setStandardDeviationX(Constants.CALIBARATION_BASE_ALLOWED_DEVIATION);
-					optionQuery.setStandardDeviationY(Constants.CALIBARATION_BASE_ALLOWED_DEVIATION);
-					optionQuery.setStandardDeviationZ(Constants.CALIBARATION_BASE_ALLOWED_DEVIATION);
+					optionQuery.setStandardDeviationX(Constants.CALIBARATION_ALLOWED_BASE_DEVIATION);
+					optionQuery.setStandardDeviationY(Constants.CALIBARATION_ALLOWED_BASE_DEVIATION);
+					optionQuery.setStandardDeviationZ(Constants.CALIBARATION_ALLOWED_BASE_DEVIATION);
 					optionQuery.save();
 					setScreenSummary();
 					caliPref.setSummary(getScreenSummary());
@@ -362,20 +385,23 @@ public class MainSettingsActivity extends PreferenceActivity {
 	private static final int DIALOG_YES_NO_MESSAGE_FOR_DELETION = 0;
 	private static final int DIALOG_YES_NO_MESSAGE_FOR_RESET_CALIBRATION = 1;
 	PreferenceScreen caliPref;
+	
 	private void setScreenSummary(){
 		screenSummary = "Gravity Value               : "+optionQuery.getValueOfGravity()+"\n" +
 		"Standard Deviation X : "+optionQuery.getStandardDeviationX()+"\n" +
 		"Standard Deviation Y : "+optionQuery.getStandardDeviationY()+"\n" +
 		"Standard Deviation Z : "+optionQuery.getStandardDeviationZ()+"\n";
 	}
+	
 	private String getScreenSummary(){
 		return this.screenSummary;
 	}
-	private void copy(String targetFile, String copyFile) {
+	
+	private void copy(File sourceFile, File destinationFile) {
 		try {
-			InputStream lm_oInput = new FileInputStream(new File(targetFile));
+			InputStream lm_oInput = new FileInputStream(sourceFile);
 			byte[] buff = new byte[128];
-			FileOutputStream lm_oOutPut = new FileOutputStream(copyFile);
+			FileOutputStream lm_oOutPut = new FileOutputStream(destinationFile);
 			while (true) {
 				int bytesRead = lm_oInput.read(buff);
 				if (bytesRead == -1)

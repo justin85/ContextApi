@@ -25,6 +25,7 @@ package activity.classifier.aggregator;
 import java.util.HashMap;
 import java.util.Map;
 
+import activity.classifier.common.Constants;
 import android.util.Log;
 
 /**
@@ -43,6 +44,37 @@ public class Aggregator {
     static final double DELTA = 0.25;
     static final double THRESHOLD = 0.5;
 
+    private final HashMap<String, HashMap<String, Double>> scores = 
+    	new HashMap<String, HashMap<String, Double>>() {
+	{
+		
+	put("", new HashMap<String, Double>() {{
+		put("CLASSIFIED", 0.5d);
+		put("UNCLASSIFIED", 0.5d);
+	}});
+
+	put("CLASSIFIED", new HashMap<String, Double>() {{
+		put("null", 0.2d);
+		put("CHARGING", 0.2d);
+		put("UNCARRIED", 0.2d);
+		put("WALKING", 0.2d);
+		put("TRAVELLING", 0.2d);
+		put("STATIONARY", 0.2d);
+	}});
+
+	put("UNCLASSIFIED", new HashMap<String, Double>() {{
+		put("UNKNOWN", 1.0d);
+	}});
+	
+	put("CLASSIFIED/CHARGING", new HashMap<String, Double>() {{
+		put("null", 0.5d);
+		put("TRAVELLING", 0.5d);
+	}});
+		
+	}
+	};
+	
+	/*
     private final HashMap<String, HashMap<String, Double>> scores
     	= new HashMap<String, HashMap<String, Double>>() {{
 		put("", new HashMap<String, Double>() {{
@@ -90,8 +122,10 @@ public class Aggregator {
 //  		put("DOWN", 0.333d);
 		}});
 	}};
-
+	*/
+    
     public void addClassification(final String classification) {
+    	
         String path = "";
 
         for (String part : classification.split("/")) {
@@ -105,38 +139,31 @@ public class Aggregator {
         }
 
         if (scores.containsKey(path)) {
-            // This classification has children which we're not using
-            // e.g. we've received CLASSIFIED/WALKING, but we're not walking
-            //      up or down stairs
-        	if(classification.equalsIgnoreCase("classified/charging")
-        			 ||classification.equalsIgnoreCase("classified/uncarried")){
-
-        	}else
-        		updateScores(scores.get(path), "null");
+    		updateScores(scores.get(path), "null");
         }
     }
 
     void updateScores(final Map<String, Double> map, final String target) {
         for (Map.Entry<String, Double> entry : map.entrySet()) {
-            Log.d(getClass().getName(), "Score for " + entry.getKey() + " was: " + entry.getValue());
+//            Log.d(Constants.DEBUG_TAG, "Score for " + entry.getKey() + " was: " + entry.getValue());
             entry.setValue(entry.getValue() * (1 - DELTA));
 
             if (entry.getKey().equals(target)) {
                 entry.setValue(entry.getValue() + DELTA);
             }
-            if (target.equalsIgnoreCase("uncarried") ||target.equalsIgnoreCase("charging")) {
+            
+            if (target.equalsIgnoreCase("uncarried") || target.equalsIgnoreCase("charging")) {
             	if (entry.getKey().equals(target)) {
             		entry.setValue((double) 1);
-                }
-            
-            }else{
+                }            
+            } else {
             	for(Map.Entry<String, Double> entry1 : map.entrySet()){
             		if (entry1.getKey().equalsIgnoreCase("uncarried") ||entry1.getKey().equalsIgnoreCase("charging")) {
             			entry1.setValue((double) 0);
                     }
             	}
             }
-            Log.d(getClass().getName(), "Score for " + entry.getKey() + " is now: " + entry.getValue());
+            Log.d(Constants.DEBUG_TAG, "Score for " + entry.getKey() + " is now: " + entry.getValue());
         }
     }
 

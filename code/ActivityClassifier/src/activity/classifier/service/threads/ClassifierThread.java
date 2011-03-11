@@ -5,6 +5,8 @@
 
 package activity.classifier.service.threads;
 
+import java.util.Arrays;
+
 import activity.classifier.accel.SampleBatch;
 import activity.classifier.accel.SampleBatchBuffer;
 import activity.classifier.classifier.Classifier;
@@ -16,6 +18,7 @@ import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.service.RecorderService;
 import activity.classifier.utils.CalcStatistics;
 import activity.classifier.utils.Calibrator;
+import activity.classifier.utils.FeatureExtractor;
 import activity.classifier.utils.RotateSamplesToVerticalHorizontal;
 import android.content.Context;
 import android.os.RemoteException;
@@ -63,7 +66,11 @@ public class ClassifierThread extends Thread {
 	private OptionQueries optionQuery;
 	private TestAVQueries testavQuery;
 
-	private CalcStatistics calcSampleStatistics = new CalcStatistics(Constants.ACCEL_DIM);	
+	private CalcStatistics rawSampleStatistics = new CalcStatistics(Constants.ACCEL_DIM);
+	
+	private float[][] rotatedMergedSamples = new float[Constants.NUM_OF_SAMPLES_PER_BATCH][2];
+	private CalcStatistics rotatedMergedSampleStatistics = new CalcStatistics(2);	
+	
 	private RotateSamplesToVerticalHorizontal rotateSamples = new RotateSamplesToVerticalHorizontal();
 	private Classifier classifier;
 
@@ -74,6 +81,8 @@ public class ClassifierThread extends Thread {
 	
 	public ClassifierThread(Context context, ActivityRecorderBinder service,
 			SampleBatchBuffer sampleBatchBuffer) {
+    	super(ClassifierThread.class.getName());
+    	
 		this.service = service;
 		this.batchBuffer = sampleBatchBuffer;
 		
@@ -83,44 +92,23 @@ public class ClassifierThread extends Thread {
 		this.optionQuery = new OptionQueries(context);
 		
 		this.optionQuery.load();
-		isCalibrated = this.optionQuery.isCalibrated();
-		if (isCalibrated) {
-			calibrator = new Calibrator(
-					service, 
-					calcSampleStatistics,
-					true,
-					this.optionQuery.getCount(),
-					new float[] {
-						this.optionQuery.getStandardDeviationX(),
-						this.optionQuery.getStandardDeviationY(),
-						this.optionQuery.getStandardDeviationZ(),
-					},
-					new float[] {
-						this.optionQuery.getMeanX(),
-						this.optionQuery.getMeanY(),
-						this.optionQuery.getMeanZ(),
-					},
-					this.optionQuery.getValueOfGravity()
-				);
-		} else {
-			calibrator = new Calibrator(
-					service,
-					calcSampleStatistics,
-					false,
-					0,
-					new float[] {
-						Constants.CALIBARATION_BASE_ALLOWED_DEVIATION,
-						Constants.CALIBARATION_BASE_ALLOWED_DEVIATION,
-						Constants.CALIBARATION_BASE_ALLOWED_DEVIATION
-					},
-					new float[] {
-						0,
-						0,
-						0
-					},
-					Constants.GRAVITY
-				);
-		}
+		calibrator = new Calibrator(
+				service, 
+				this.optionQuery.isCalibrated(),
+				this.optionQuery.getAllowedMultiplesOfDeviation(),
+				this.optionQuery.getCount(),
+				new float[] {
+					this.optionQuery.getStandardDeviationX(),
+					this.optionQuery.getStandardDeviationY(),
+					this.optionQuery.getStandardDeviationZ(),
+				},
+				new float[] {
+					this.optionQuery.getMeanX(),
+					this.optionQuery.getMeanY(),
+					this.optionQuery.getMeanZ(),
+				},
+				this.optionQuery.getValueOfGravity()
+			);
 		
 		this.shouldExit = false;
 	}
@@ -160,6 +148,7 @@ public class ClassifierThread extends Thread {
 				Log.v(Constants.DEBUG_TAG, "Classifier thread received batch");
 
 				// process the sample batch to obtain the classification
+				long sampleTime = batch.sampleTime;
 				String classification = processData(batch);
 				Log.v(Constants.DEBUG_TAG, "Classification found: '"+classification+"'");
 
@@ -167,7 +156,7 @@ public class ClassifierThread extends Thread {
 				batchBuffer.returnEmptyInstance(batch);
 				if (classification!=null && classification.length()>0) {
 					// submit the classification
-					service.submitClassification(classification);
+					service.submitClassification(sampleTime, classification);
 				}
 			} catch (RemoteException ex) {
 				Log.e(Constants.DEBUG_TAG,
@@ -189,10 +178,27 @@ public class ClassifierThread extends Thread {
 		int size = batch.getSize();
 		long sampleTime = batch.sampleTime;
 		boolean chargingState = false;//batch.isCharging();
-		float[] dataMeans = calcSampleStatistics.createVector(),
-				dataSd = calcSampleStatistics.createVector();
 		
-		calibrator.processData(sampleTime, data, size, dataMeans, dataSd);
+		if (Constants.OUTPUT_DEBUG_INFO) {
+			testavQuery.reset(sampleTime);
+		}
+		
+		rawSampleStatistics.assign(data, size);
+		
+		float[] dataMin = rawSampleStatistics.getMin();
+		float[] dataMax = rawSampleStatistics.getMax();
+		float[] dataMeans = rawSampleStatistics.getMean();
+		float[] dataSd = rawSampleStatistics.getStandardDeviation();
+		
+		if (Constants.OUTPUT_DEBUG_INFO) {
+			testavQuery.setUnrotatedMeans(
+					dataMeans[Constants.ACCEL_X_AXIS],
+					dataMeans[Constants.ACCEL_Y_AXIS],
+					dataMeans[Constants.ACCEL_Z_AXIS]
+					          );
+		}
+		
+		calibrator.processData(sampleTime, dataMeans, dataSd);
 		
 		if (!isCalibrated && calibrator.isCalibrated()) {
 			Log.v(Constants.DEBUG_TAG, "Calibration just finished. Saving values to DB.");
@@ -200,6 +206,7 @@ public class ClassifierThread extends Thread {
 			float[] sd = calibrator.getSd();
 			float[] mean = calibrator.getMean();
 			
+			optionQuery.load();
 			optionQuery.setCalibrationState(true);
 			optionQuery.setMeanX(mean[Constants.ACCEL_X_AXIS]);
 			optionQuery.setMeanY(mean[Constants.ACCEL_Y_AXIS]);
@@ -209,7 +216,6 @@ public class ClassifierThread extends Thread {
 			optionQuery.setStandardDeviationZ(sd[Constants.ACCEL_Z_AXIS]);
 			optionQuery.setCount(calibrator.getCount());
 			optionQuery.setValueOfGravity(calibrator.getValueOfGravity());
-			
 			optionQuery.save();
 			
 			isCalibrated = true;
@@ -220,27 +226,42 @@ public class ClassifierThread extends Thread {
 		//	check the current gravity, rotate and perform classification
 		{
 			float gravity = calibrator.getValueOfGravity();
-			float calcGravity = calcSampleStatistics.calcMag(dataMeans);
-			float diffGravity = calcGravity-gravity;
-			if (diffGravity<0.0)
-				diffGravity = -diffGravity;
-			if (diffGravity>gravity*Constants.GRAVITY_DEV) {
-				Log.v(Constants.DEBUG_TAG, "Deviation from gravity too large! Found gravity="+calcGravity+", expected gravity="+gravity);
-				return "";
+			float calcGravity = rawSampleStatistics.calcMag(dataMeans);
+			float minGravity = gravity - gravity*Constants.MIN_GRAVITY_DEV;
+			float maxGravity = gravity + gravity*Constants.MIN_GRAVITY_DEV;
+			
+			if (calcGravity>=minGravity && calcGravity<=maxGravity) {
+				if (!(calcGravity>=minGravity))
+					Log.v(Constants.DEBUG_TAG, "Gravity too low! Found gravity="+calcGravity+", expected ["+minGravity+","+maxGravity+"]");
+				if (!(calcGravity<=maxGravity))
+					Log.v(Constants.DEBUG_TAG, "Gravity too high! Found gravity="+calcGravity+", expected ["+minGravity+","+maxGravity+"]");
+				// first rotate samples to world-orientation
+				if (rotateSamples.rotateToWorldCoordinates(dataMeans, data)) {
+					classification = classifier.classifyRotated(data);
+					
+					if (Constants.OUTPUT_DEBUG_INFO) {
+						logRotatedValues(dataMeans, data, size);
+						testavQuery.setClassifierAlgoOutput(classification);
+					}
+					
+				} else {
+					Log.v(Constants.DEBUG_TAG, "Unable to perform classification, data could not be rotated!");
+					if (Constants.OUTPUT_DEBUG_INFO) {
+						testavQuery.setClassifierAlgoOutput("ERROR: Unable to rotate gravity "+Arrays.toString(dataMeans));
+					}
+				}
+			} else {
+				if (Constants.OUTPUT_DEBUG_INFO) {
+					testavQuery.setClassifierAlgoOutput("ERROR: Gravity "+calcGravity+" not within limits: ["+minGravity+","+maxGravity+"]");
+				}
 			}
 
-			// first rotate samples to world-orientation
-			if (rotateSamples.rotateToWorldCoordinates(dataMeans, data)) {
-				classification = classifier.classifyRotated(data);
-			} else {
-				Log.v(Constants.DEBUG_TAG, "Unable to perform classification, data could not be rotated!");
-			}
 		}
 		
 		if (calibrator.isUncarried()) {
-			if (classification.contains("TRAVELLING"))
-				return "CLASSIFIED/UNCARRIED/TRAVELLING";
-			else
+//			if (classification.contains("TRAVELLING"))
+//				return "CLASSIFIED/UNCARRIED/TRAVELLING";
+//			else
 				return "CLASSIFIED/UNCARRIED";
 		}
 		
@@ -251,7 +272,42 @@ public class ClassifierThread extends Thread {
 				return "CLASSIFIED/CHARGING";
 		}
 		
+		if (Constants.OUTPUT_DEBUG_INFO) {
+			testavQuery.setFinalClassifierOutput(classification);
+			testavQuery.deleteTestValuesBefore(System.currentTimeMillis()-(24L*60L*60L*1000L));
+			testavQuery.insertTestValues();
+		}
+		
 		return classification;
+	}
+	
+	private void logRotatedValues(float[] dataMeans, float[][] rotatedData, int dataSize)
+	{
+		for (int j=0; j<Constants.NUM_OF_SAMPLES_PER_BATCH; ++j) {
+			rotatedMergedSamples[j][0] = (float)Math.sqrt(
+					rotatedData[j][0]*rotatedData[j][0] +
+					rotatedData[j][1]*rotatedData[j][1]);
+			rotatedMergedSamples[j][1] = rotatedData[j][2];
+		}
+		
+		rotatedMergedSampleStatistics.assign(rotatedMergedSamples, dataSize);
+		
+		float[] rotatedMin = rotatedMergedSampleStatistics.getMin();
+		float[] rotatedMax = rotatedMergedSampleStatistics.getMax();
+		float[] rotatedMeans = rotatedMergedSampleStatistics.getMean();
+		float[] rotatedSd = rotatedMergedSampleStatistics.getStandardDeviation();
+		
+		testavQuery.setRotatedStats(
+				rotatedMeans[0],
+				rotatedMeans[1],
+				
+				rotatedMax[0]-rotatedMin[0],
+				rotatedMax[1]-rotatedMin[1],
+				
+				rotatedSd[0],
+				rotatedSd[1]
+				);
+		
 	}
 	
 }

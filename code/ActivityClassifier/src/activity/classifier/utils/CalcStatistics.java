@@ -62,6 +62,11 @@ public class CalcStatistics {
 	 */
 	private float mean[];
 	
+	/**
+	 * The sd of the array data.
+	 */
+	private float sd[];
+	
 	public CalcStatistics(int dimensions) {
 		this.dimensions = dimensions;
 
@@ -70,6 +75,7 @@ public class CalcStatistics {
 		this.max = new float[dimensions];
 		this.min = new float[dimensions];
 		this.mean = new float[dimensions];
+		this.sd = new float[dimensions];
 	}
 	
 	/**
@@ -117,6 +123,10 @@ public class CalcStatistics {
 			mean[j] = sum[j] / (samples);
 		}
 
+		for (int j = 0; j < dimensions; j++) {
+			sd[j] = (float) Math.sqrt(sumSqr[j] / count
+					- mean[j] * mean[j]);
+		}
 	}
 
 	/**
@@ -158,21 +168,6 @@ public class CalcStatistics {
 		verticalAccel = (float) Math.sqrt(verticalAccel);
 		return verticalAccel;
 	}
-
-	/**
-	 * 
-	 * @return standard deviation of all the items that have been entered. Value
-	 *         will be Double.NaN if count == 0.
-	 */
-	public float[] computeStandardDeviation(float[] standardDeviation) {
-		for (int j = 0; j < dimensions; j++) {
-//			Log.i("sd", "count" + count + " sum_sqr " + sumSqr[j] + " mean "
-//					+ mean[j] + " ");
-			standardDeviation[j] = (float) Math.sqrt(sumSqr[j] / count
-					- mean[j] * mean[j]);
-		}
-		return standardDeviation;
-	}
 	
 	/**
 	 * 
@@ -180,7 +175,7 @@ public class CalcStatistics {
 	 *         will be Double.NaN if count == 0.
 	 */
 	public float[] getStandardDeviation() {
-		return computeStandardDeviation(new float[dimensions]);
+		return sd;
 	}
 
 	/**
@@ -212,10 +207,7 @@ public class CalcStatistics {
 	 * the magnitude of the vector
 	 */
 	public float calcMag(float[] vec) {
-		double mag = 0.0f;
-		for (int i=0; i<dimensions; ++i)
-			mag += vec[i]*vec[i];
-		return (float)Math.sqrt(mag);
+		return calcMag(dimensions, vec);
 	}
 	
 	/**
@@ -228,5 +220,20 @@ public class CalcStatistics {
 	public float[] createVector() {
 		return new float[dimensions];
 	}	
+	
+	public static float calcMag(int dimensions, float[] vec) {
+		double mag = 0.0f;
+		for (int i=0; i<dimensions; ++i)
+			mag += vec[i]*vec[i];
+		return (float)Math.sqrt(mag);
+	}
+	
+	public static void normalize(int dimensions, float[] vec) {
+        float length = calcMag(dimensions, vec);
+        if (length != 0) {
+    		for (int i=0; i<dimensions; ++i)
+    			vec[i] /= length;
+        }
+	}
 	
 }

@@ -55,6 +55,8 @@ public class UploadActivityHistoryThread extends Thread {
 	 * @param context context from Activity or Service classes passes to {@link ActivityQueries} class instance.
 	 */
 	public UploadActivityHistoryThread(Context context, ActivityQueries activityQuery, PhoneInfo phoneInfo) {
+    	super(UploadActivityHistoryThread.class.getName());
+    	
 		this.activityQuery = activityQuery;
 		this.phoneInfo = phoneInfo;
 
@@ -131,6 +133,8 @@ public class UploadActivityHistoryThread extends Thread {
 
 	private void uploadData(String accountName)
 	{
+		Log.v(Constants.DEBUG_TAG, "Upload Activity History Thread attempting to upload data.");
+		
 		HttpClient client = new DefaultHttpClient();
 
 		final HttpPost post = new HttpPost(Constants.URL_ACTIVITY_POST);
@@ -142,6 +146,7 @@ public class UploadActivityHistoryThread extends Thread {
 		ArrayList<String> itemStartDates = new ArrayList<String>();
 		ArrayList<String> itemEndDates = new ArrayList<String>();
 		ArrayList<Integer> itemIDs = new ArrayList<Integer>();
+		
 		//open database and check the un-posted data
 		activityQuery.getUncheckedItemsFromActivityTable(0);
 

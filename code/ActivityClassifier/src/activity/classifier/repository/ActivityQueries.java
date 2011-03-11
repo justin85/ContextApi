@@ -24,6 +24,12 @@ import android.util.Log;
  *
  */
 public class ActivityQueries extends Queries{
+	
+	public static final String ACTIVITY_END = "END";
+	
+	public static boolean isSystemActivity(String activity) {
+		return ACTIVITY_END.equals(activity);
+	}
 
 	private DbAdapter dbAdapter;
 
@@ -141,18 +147,22 @@ public class ActivityQueries extends Queries{
 		seperateItems(items);
 		setUncheckedItemsSize(items.size());
 	}
+	
 	public synchronized ArrayList<String[]> getTodayItemsFromActivityTable(){
 
 		ArrayList<String[]> items = new ArrayList<String[]>();
 		Date date = new Date();
 		int day = date.getDate();
 		int month = date.getMonth()+1;
+		
 		Calendar calendarToday = Calendar.getInstance();
 		calendarToday.add(Calendar.DAY_OF_MONTH, -1);
 		Date todayTime = calendarToday.getTime();
+		
 		Calendar calendarFourHour = Calendar.getInstance();
 		calendarFourHour.add(Calendar.HOUR, -4);
 		Date fourHourTime = calendarFourHour.getTime();
+		
 		Calendar calendarHour = Calendar.getInstance();
 		calendarHour.add(Calendar.HOUR, -1);
 		Date hourTime = calendarHour.getTime();
@@ -170,8 +180,8 @@ public class ActivityQueries extends Queries{
 		activityGroup=getActivityGroup(items);
 
 		return items;
-
 	}
+	
 	private Date todayTime;
 	private Date fourHourTime;
 	private Date hourTime;
@@ -353,6 +363,7 @@ public class ActivityQueries extends Queries{
 			itemEndDates.add(line[3]);
 		}
 	}
+	
 	private void seperateItems(ArrayList<ArrayList<String>> uncheckedItems,int size){
 		if(!todayItemIDs.isEmpty()){
 			todayItemIDs.clear();

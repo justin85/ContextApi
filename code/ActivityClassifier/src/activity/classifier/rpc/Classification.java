@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import activity.classifier.common.Constants;
+import activity.classifier.repository.ActivityQueries;
 import android.content.Context;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -89,7 +90,7 @@ public class Classification implements Parcelable {
 			duration = (length / (60 * 60)) + " hrs";
 		}
 
-		if(niceClassification.equals("waiting") || classification.equals("END")){
+		if (ActivityQueries.isSystemActivity(classification)) {
 			return niceClassification+"";
 		}
 		else{
@@ -128,18 +129,14 @@ public class Classification implements Parcelable {
 					);
 	
 		//Log.v(Constants.DEBUG_TAG, "Classification derived name: '"+name+"' from: '"+classification+"'");
-	
-		if(!name.equals("activity_waitng")){
-			int id = context.getResources().getIdentifier(
-					name, "string", "activity.classifier");
-			if (id>0)
-				return (String) context.getResources().getText(id);
-			else {
-				throw new RuntimeException("Unrecognized Activity classified as '"+classification+"' ('"+name+"')");
-				//return classification;
-			}
-		}else{
-			return "waiting";
+
+		int id = context.getResources().getIdentifier(
+				name, "string", "activity.classifier");
+		if (id>0)
+			return (String) context.getResources().getText(id);
+		else {
+			throw new RuntimeException("Unrecognized Activity classified as '"+classification+"' ('"+name+"')");
+			//return classification;
 		}
 	}
 

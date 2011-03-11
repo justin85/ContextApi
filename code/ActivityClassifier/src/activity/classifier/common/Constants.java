@@ -1,10 +1,13 @@
 package activity.classifier.common;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 
+import activity.classifier.activity.ActivityChartActivity;
 import activity.classifier.service.RecorderService;
 import activity.classifier.service.threads.AccountThread;
 import activity.classifier.service.threads.UploadActivityHistoryThread;
+import android.os.Environment;
 
 /**
  * 
@@ -12,6 +15,20 @@ import activity.classifier.service.threads.UploadActivityHistoryThread;
  *
  */
 public class Constants {
+	
+	/**
+	 *	<p>Affects the options application has.</p>
+	 *	<p>
+	 *  Extra options are given to developers. Like:<br/>
+	 *		pick whether aggregation is used or not.
+	 *	</p> 
+	 */
+	public final static boolean IS_DEV_VERSION = true;
+	
+	/**
+	 * Should we or should we not output debugging information?
+	 */
+	public static final boolean OUTPUT_DEBUG_INFO = true;
 	
 	/**
 	 * Duration for the {@link AccountThread} to wait for the user's account
@@ -22,20 +39,25 @@ public class Constants {
 	/**
 	 * The interval between successive user interface updates in the {@link ActivityRecorderActivity}
 	 */
-	public static final int DELAY_UI_UPDATE = 500;
+	public static final int DELAY_UI_UPDATE = 15*1000;
 	
-	public static final int DELAY_UI_GRAPHIC_UPDATE = 15000;
+	/**
+	 * The interval between successive user interface updates in the {@link ActivityChartActivity}
+	 * This value should be quite large because updating the chart takes a large amount of
+	 * processing.
+	 */
+	public static final int DELAY_UI_GRAPHIC_UPDATE = 15*1000;
 	
 	/**
 	 * The interval between successive data uploads in {@link UploadActivityHistoryThread}
 	 */
-	public static final int DELAY_UPLOAD_DATA = 300*1000;	//	5min in ms
+	public static final int DELAY_UPLOAD_DATA = 5*60*1000;	//	5min in ms
 	
 	/**
 	 * The delay after the dialog appears and before the {@link RecorderService} in
 	 * the 'start service' display sequence in the class {@link ActivityRecorderActivity}
 	 */
-	public static final int DELAY_SERVICE_START = 500;
+	public static final int DELAY_SERVICE_START = 1000;
 
 	/**
 	 * The delay between two consecutive sampling batches.
@@ -64,6 +86,13 @@ public class Constants {
 	 */
 	public static final String PATH_ACTIVITY_RECORDS_DB = "data/data/activity.classifier/databases/"+RECORDS_FILE_NAME;
 
+	/**
+	 * Path to the activity records file
+	 */
+	public static final String PATH_SD_CARD_DUMP_DB = 
+		Environment.getExternalStorageDirectory() + File.separator + 
+		"activityclassifier" + File.separator + RECORDS_FILE_NAME;
+	
 	/**
 	 * Path to the activity records file
 	 */
@@ -104,7 +133,8 @@ public class Constants {
 	 *	because of the phone accelerating fast during the sampling period
 	 *	e.g. in a car after a traffic light.
 	 */
-	public static final float GRAVITY_DEV = 0.15f; // 15% of gravity	
+	public static final float MIN_GRAVITY_DEV = 0.5f; // 15% of gravity	
+	public static final float MAX_GRAVITY_DEV = 1.0f; // 100% of gravity	
 	
 	/**
 	 * The number of axi on the accelerometer
@@ -130,8 +160,8 @@ public class Constants {
 	 * The duration the phone is required to be stationary before doing calibration
 	 */
 	//	TODO: CHANGE THIS BEFORE COMMIT
-	//public final static long DURATION_OF_CALIBRATION = 60*1000; // 60 seconds
-	public final static long DURATION_OF_CALIBRATION = 10*60*1000; // 60 seconds
+	public final static long DURATION_OF_CALIBRATION = 60*1000; // 60 seconds
+//	public final static long DURATION_OF_CALIBRATION = 10*60*1000; // 60 seconds
 
 	/**
 	 * The deviation in the means of the accelerometer axis
@@ -140,20 +170,20 @@ public class Constants {
 	 * This value is only used initially, after calibration, the values used in
 	 * the calibration are used instead.
 	 * 
-	 * See {@link #CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION} for more info.
+	 * See {@link #CALIBARATION_ALLOWED_MULTIPLES_DEVIATION} for more info.
 	 */
-	public final static float CALIBARATION_BASE_ALLOWED_DEVIATION = 9.8f*0.03f;	// 3% of Gravity
+	public final static float CALIBARATION_ALLOWED_BASE_DEVIATION = 0.05f;
 
 	/**
-	 * This value is multiplied by the {@value #CALIBARATION_BASE_ALLOWED_DEVIATION} value
+	 * This value is multiplied by the {@value #CALIBARATION_ALLOWED_BASE_DEVIATION} value
 	 * to get the range which the phone's accelerometer axis standard deviation is allowed to be in 
 	 * for the phone to be detected as stationary. 
 	 * 
-	 * The {@value #CALIBARATION_BASE_ALLOWED_DEVIATION} value is only used initially, 
+	 * The {@value #CALIBARATION_ALLOWED_BASE_DEVIATION} value is only used initially, 
 	 * after calibration, the values used in the calibration are used instead.
 	 * 
 	 */
-	public final static float CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION = 5.0f;	// 5 times the standard deviation
+	public final static float CALIBARATION_ALLOWED_MULTIPLES_DEVIATION = 2.0f;	// 2 times the standard deviation
 	
 	/**
 	 * The duration which the means of different axis should be the same for the state
@@ -165,4 +195,5 @@ public class Constants {
 	 * The format used to store date values into the database
 	 */
 	public final static SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z");
+	
 }

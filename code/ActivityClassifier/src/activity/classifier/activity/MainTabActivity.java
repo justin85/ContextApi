@@ -79,11 +79,22 @@ public class MainTabActivity extends TabActivity {
 		public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
 			service = ActivityRecorderBinder.Stub.asInterface(iBinder);
 			updateButtonRunnable.updateNow();
+			
+			Log.v(Constants.DEBUG_TAG, "MainTabActivity: Connected to service");
+			
+			try {
+				Log.v(Constants.DEBUG_TAG, "Was the service started? "+optionQuery.getServiceStartedState()+", Is Running? "+service.isRunning());
+				if (optionQuery.getServiceStartedState() && !service.isRunning()) {
+					MainTabActivity.this.startService();
+				}
+			} catch (RemoteException e) {
+				Log.v(Constants.DEBUG_TAG, "Error while attempting to automatically start service", e);
+			}
 		}
 
 		public void onServiceDisconnected(ComponentName componentName) {
 			service = null;
-
+			Log.v(Constants.DEBUG_TAG, "MainTabActivity: Disconnected from service");
 		}
 
 
@@ -132,40 +143,15 @@ public class MainTabActivity extends TabActivity {
 		switch (item.getItemId()) {
 
 		case R.id.startService:
-			try {
-
-				EnableDeletion = false;
-				FlurryAgent.onEvent("recording_start");
-				startServiceRunnable.startService();
-
-			} catch (Exception ex) {
-				Log.e(Constants.DEBUG_TAG, "Unable to get service state", ex);
-			}
+			startService();
 			break;
 		case R.id.stopService:
-			try {
-				if (service.isRunning()) {
-
-					EnableDeletion = true;
-					FlurryAgent.onEvent("recording_stop");
-
-					onDestroy();
-					stopService(new Intent(MainTabActivity.this, RecorderService.class));
-					//					unbindService(connection);
-					bindService(new Intent(MainTabActivity.this, RecorderService.class),
-							connection, BIND_AUTO_CREATE);
-
-				} 
-			} catch (RemoteException ex) {
-				Log.e(Constants.DEBUG_TAG, "Unable to get service state", ex);
-			}
+			stopService();
 			break;
 		}
 		return true;
 
 	}
-
-
 
 	/**
 	 * 
@@ -175,9 +161,7 @@ public class MainTabActivity extends TabActivity {
 		super.onDestroy();
 		unbindService(connection);
 	}
-
-
-
+	
 	/**
 	 * 
 	 */
@@ -198,19 +182,16 @@ public class MainTabActivity extends TabActivity {
 		FlurryAgent.onEndSession(this);
 	}
 
-
-
-
-
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
+		//set exception handler
 		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
 
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		optionQuery = new OptionQueries(this);
-
+		optionQuery.load();
 
 		final TabHost tabHost = getTabHost();
 
@@ -227,9 +208,52 @@ public class MainTabActivity extends TabActivity {
 				.setIndicator(" ",getResources().getDrawable(R.drawable.settings72))
 				.setContent(new Intent(this, MainSettingsActivity.class)
 				.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)));
+		
 		bindService(new Intent(this, RecorderService.class), connection, BIND_AUTO_CREATE);
 		EnableDeletion = true;
+		
+	}
+	
+	
+	private void startService()
+	{
+		try {
 
+			EnableDeletion = false;
+			FlurryAgent.onEvent("recording_start");
+			startServiceRunnable.startService();
+
+			optionQuery.load();
+			optionQuery.setServiceStartedState(true);
+			optionQuery.save();
+			
+		} catch (Exception ex) {
+			Log.e(Constants.DEBUG_TAG, "Unable to get service state", ex);
+		}
+	}
+	
+	private void stopService()
+	{
+		try {
+			if (service.isRunning()) {
+
+				optionQuery.load();
+				optionQuery.setServiceStartedState(false);
+				optionQuery.save();
+				
+				EnableDeletion = true;
+				FlurryAgent.onEvent("recording_stop");
+
+				onDestroy();
+				stopService(new Intent(MainTabActivity.this, RecorderService.class));
+				//					unbindService(connection);
+				bindService(new Intent(MainTabActivity.this, RecorderService.class),
+						connection, BIND_AUTO_CREATE);
+
+			}
+		} catch (RemoteException ex) {
+			Log.e(Constants.DEBUG_TAG, "Unable to get service state", ex);
+		}
 	}
 
 	/**
@@ -361,7 +385,6 @@ public class MainTabActivity extends TabActivity {
 		 * 
 		 * @throws ParseException
 		 */
-		@SuppressWarnings("unchecked")
 		private void updateButton() throws ParseException {
 
 			try {
@@ -382,6 +405,7 @@ public class MainTabActivity extends TabActivity {
 					}
 				}
 
+				prevServiceRunning = isServiceRunning;
 
 			} catch (RemoteException ex) {
 				Log.e(Constants.DEBUG_TAG, "Error while updating user interface", ex);

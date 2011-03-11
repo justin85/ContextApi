@@ -23,11 +23,15 @@
 package activity.classifier.classifier;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import activity.classifier.common.Constants;
+import activity.classifier.common.StringComparator;
 import activity.classifier.utils.CalcStatistics;
 import activity.classifier.utils.FeatureExtractor;
 import android.util.Log;
@@ -41,6 +45,8 @@ import android.util.Log;
  * @author chris
  */
 public class KnnClassifier implements Classifier {
+	
+	private static final int K_VALUE = 5;
 
     private final Set<Map.Entry<Float[], String>> model;
     
@@ -49,6 +55,13 @@ public class KnnClassifier implements Classifier {
      */
     private FeatureExtractor featureExtractor;
     
+    //	the distances of each of the samples found in the model to the newly sampled data
+    private ClassificationDist[] distances;
+    //	a comparator that compares between two ClassificationDist instances
+    private ClassificationDistComparator distanceComparator = new ClassificationDistComparator();
+    //	used to obtain the counts of different activities within the K-nearest neighbours in the KNN
+    private Map<String,Integer> activityCounts = new TreeMap<String,Integer>(new StringComparator(false));
+    
     /**
      * Set the clustered data set for classification.
      * @param model clustered data set
@@ -56,6 +69,10 @@ public class KnnClassifier implements Classifier {
     public KnnClassifier(final Set<Entry<Float[], String>> model) {
         this.model = model;
         this.featureExtractor = new FeatureExtractor(Constants.NUM_OF_SAMPLES_PER_BATCH);
+        
+        this.distances = new ClassificationDist[model.size()];
+        for (int i=0; i<model.size(); ++i)
+        	this.distances[i] = new ClassificationDist();
     }
 
     /* (non-Javadoc)
@@ -68,11 +85,7 @@ public class KnnClassifier implements Classifier {
     }
     
     private String internClassify(float[] features) {
-    	//Log.v(Constants.DEBUG_TAG, "Classifier.classify: "+Arrays.toString(features));
-    	
     	float temp;
-        float bestDistance = Float.MAX_VALUE;
-        String bestActivity = "UNCLASSIFIED/UNKNOWN";
 
         /*
          *  Compare between the points from the sample data and the points from the clustered data set.
@@ -80,25 +93,67 @@ public class KnnClassifier implements Classifier {
          */
         //	TODO: This doesn't have to be iterative (linear). It can be optimized using windows
         //			to cut out most of the checking.
-        for (Map.Entry<Float[], String> entry : model) {
-        	String activity = entry.getValue();
-        	Float[] activityFeatures = entry.getKey();
-        	
-            float distance = 0;
-
-            for (int i = 0; i < features.length; i++) {
-            	temp = features[i] - activityFeatures[i];
-                distance += temp*temp;
-            }
-
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                bestActivity = entry.getValue();
-            }
-        }
+    	
+    	{	// compute distances
+	        int i = 0;
+	        
+	        for (Map.Entry<Float[], String> entry : model) {
+	        	String activity = entry.getValue();
+	        	Float[] activityFeatures = entry.getKey();
+	        	
+	            float distance = 0;
+	
+	            for (int f = 0; f < features.length; f++) {
+	            	temp = features[f] - activityFeatures[f];
+	                distance += temp*temp;
+	            }
+	            
+	            distances[i].classification = activity;
+	            distances[i].distance = distance;
+	            ++i;
+	        }
+    	}
+    	
+    	// sort distances
+        Arrays.sort(distances, distanceComparator);
+        activityCounts.clear();
         
-        Log.v(Constants.DEBUG_TAG, "Best Activity: '"+bestActivity+"' by "+bestDistance);
+        String bestActivity = "UNCLASSIFIED/UNKNOWN";
+        int bestCount = 0;
+        
+        for (int l = model.size(), i=0; i<K_VALUE && i<l; ++i) {
+        	Integer count = activityCounts.get(distances[i].classification);
+        	if (count==null)
+        		count = 0;
+        	count = count + 1;
+        	activityCounts.put(distances[i].classification, count);
+        	
+        	if (count>bestCount) {
+        		bestCount = count;
+        		bestActivity = distances[i].classification;
+        	}
+        }
 
         return bestActivity;
+    }
+    
+    private static class ClassificationDist {
+    	String classification;
+    	float distance;
+    	
+		public ClassificationDist() {
+			this.classification = "";
+			this.distance = 0.0f;
+		}
+
+    }
+    
+    private static class ClassificationDistComparator implements Comparator<ClassificationDist> {
+
+		@Override
+		public int compare(ClassificationDist arg0, ClassificationDist arg1) {
+			return Double.compare(arg0.distance, arg1.distance);
+		}
+    	
     }
 }

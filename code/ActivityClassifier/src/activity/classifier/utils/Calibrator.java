@@ -2,7 +2,6 @@ package activity.classifier.utils;
 
 import activity.classifier.common.Constants;
 import activity.classifier.rpc.ActivityRecorderBinder;
-import android.app.backup.RestoreObserver;
 import android.os.RemoteException;
 import android.util.Log;
 
@@ -28,11 +27,10 @@ public class Calibrator {
 	private float valueOfGravity;
 	
 	private ActivityRecorderBinder service;
+	private float allowedMultiplesOfDeviation;
 	private boolean isUncarried;
 	private boolean isCalibrated;
 	
-	private CalcStatistics rawDataStatistics;
-
 	/**
 	 * Holds instances of measurements to check if the phone has moved or not within a certain
 	 * period of time
@@ -67,8 +65,8 @@ public class Calibrator {
 	 */
 	public Calibrator(
 			ActivityRecorderBinder service,
-			CalcStatistics rawDataStatistics,
 			boolean isCalibrated,
+			float allowedMultiplesOfDeviation,
 			int resetCount,
 			float[] resetSd,
 			float[] resetMean,
@@ -81,10 +79,10 @@ public class Calibrator {
 		this.resetSd = resetSd;
 		this.resetMean = resetMean;
 		this.resetValueOfGravity = resetValueOfGravity;
-		
+
+		this.allowedMultiplesOfDeviation = allowedMultiplesOfDeviation;
 		this.isCalibrated = isCalibrated;
 		this.service = service;
-		this.rawDataStatistics = rawDataStatistics;
 		this.measurementsBuffer = new MeasurementsBuffer(
 				(int)Math.round(
 						//	twice the longest duration we expect to cater for
@@ -320,26 +318,19 @@ public class Calibrator {
 	 * @throws InterruptedException
 	 */
 	synchronized
-	public void processData(long sampleTime, float[][] data, int size, float[] returnedMeans, float[] returnedSd) throws InterruptedException
+	public void processData(long sampleTime, float[] mean, float[] sd) throws InterruptedException
 	{
 		//Log.v(Constants.DEBUG_TAG, "Calibration measurement instances left: "+measurementsBuffer.getPendingEmptyInstances());
 		
-		//	assign raw data
-		rawDataStatistics.assign(data, size);
-		
 		//	current found gravity
 		Measurement currGravity = measurementsBuffer.takeEmptyInstance();
-		//	compute the standard deviation
-		rawDataStatistics.computeStandardDeviation(currGravity.axisSd);
-		//	compute the mean, and assign mean and standard deviations to be returned
-		{
-			float[] mean = rawDataStatistics.getMean();
-			for (int i=0; i<Constants.ACCEL_DIM; ++i) {
-				currGravity.axisMean[i] = mean[i];
-				returnedMeans[i] = mean[i];
-				returnedSd[i] = currGravity.axisSd[i];
-			}
+
+		//	assign mean and standard deviations to be returned
+		for (int i=0; i<Constants.ACCEL_DIM; ++i) {
+			currGravity.axisMean[i] = mean[i];
+			currGravity.axisSd[i] = sd[i];
 		}
+		
 		//	assign the time to the time the sample was taken
 		currGravity.time = sampleTime;
 		
@@ -349,7 +340,7 @@ public class Calibrator {
 		Measurement lastGravity = null;
 		
 		//	check if there is any motion in the current found data
-		if (hasMotion(currGravity, resetSd, Constants.CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION)) {
+		if (hasMotion(currGravity, resetSd, allowedMultiplesOfDeviation)) {
 			Log.v(Constants.DEBUG_TAG, "Motion detected in current measurement");
 //			for (int i=0; i<data.length; ++i) {
 //				String s = "";
@@ -369,7 +360,7 @@ public class Calibrator {
 			lastGravity = measurementsBuffer.peekFilledInstance();
 			
 			// check if there is any movement detected
-			while (lastGravity!=null && hasMovement(lastGravity, currGravity, resetSd, Constants.CALIBARATION_MAGNITUDE_ALLOWED_DEVIATION)) {
+			while (lastGravity!=null && hasMovement(lastGravity, currGravity, resetSd, allowedMultiplesOfDeviation)) {
 				//	get rid of it
 				measurementsBuffer.returnEmptyInstance(measurementsBuffer.takeFilledInstance());
 				//	get the next
@@ -443,8 +434,8 @@ public class Calibrator {
 		@Override
 		protected Measurement getNewInstance() {
 			return new Measurement(
-					rawDataStatistics.createVector(),
-					rawDataStatistics.createVector()
+					new float[Constants.ACCEL_DIM],
+					new float[Constants.ACCEL_DIM]
 					);
 		}
 		

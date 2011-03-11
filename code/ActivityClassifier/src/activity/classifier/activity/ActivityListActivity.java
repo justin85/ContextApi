@@ -102,6 +102,7 @@ public class ActivityListActivity extends Activity {
 	@Override
 	public void onCreate(Bundle icicle) {
 		super.onCreate(icicle);
+		
 		//set exception handler
 		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
 
@@ -163,11 +164,7 @@ public class ActivityListActivity extends Activity {
 		// wl.release();
 		FlurryAgent.onEndSession(this);
 	}
-
-
-
-
-
+	
 	/**
 	 * Performs scheduled user interface updates, also allows
 	 * other components to request the user interface to be updated,
@@ -180,8 +177,6 @@ public class ActivityListActivity extends Activity {
 		//	save the state of the service, if it was previously running or not
 		//		to avoid unnecessary updates
 		private boolean prevServiceRunning = false;
-
-		private boolean isDatabaseDisplayed = false;
 
 		//	avoids conflicts between scheduled updates,
 		//		and once-off updates 
@@ -254,64 +249,35 @@ public class ActivityListActivity extends Activity {
 				boolean isServiceRunning = service!=null && service.isRunning();
 
 				int count = activityQuery.getSizeOfTable();
-				Log.i("countActivityTable","#1"+count);
+				
 				if(count>0){
 					//	update list either if service state has changed, or it's still running
 					if (isServiceRunning!=prevServiceRunning || isServiceRunning) {
 
-						List<Classification> classifications = Collections.EMPTY_LIST;
-						if (isServiceRunning)
-							classifications = service.getClassifications();
-						
-
 						final ArrayAdapter<Classification> adapter = (ArrayAdapter<Classification>) ((ListView) findViewById(R.id.list)).getAdapter();
 
-						if(!isDatabaseDisplayed){
-							Log.i("test","HERE");
-							SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z"); 
-							ArrayList<String[]> items = new ArrayList<String[]>();
-							items = activityQuery.getTodayItemsFromActivityTable();
-							ArrayList<Classification> classification = new ArrayList<Classification>();
-							for(int i=0;i<items.size();i++){
-								classification.add(new Classification(items.get(i)[1],dateFormat.parse(items.get(i)[2]).getTime(),dateFormat.parse(items.get(i)[3]).getTime()));
-
-							}
-
-							for (int i = 1; i <= classification.size(); i++) {
-								Classification c = classification.get(classification.size()-i);
-								if (c!=null)
-									c = c.withContext(ActivityListActivity.this);
-								if (c!=null)
-									adapter.add(c);
-							}
-							//Log.i("countActivityTable","#2"+adapter.getCount());
-							//Log.i("countActivityTable","#3"+classification.size());
-							isDatabaseDisplayed=true;
+						ArrayList<String[]> items = new ArrayList<String[]>();
+						items = activityQuery.getTodayItemsFromActivityTable();
+						ArrayList<Classification> classification = new ArrayList<Classification>();
+						for(int i=0;i<items.size();i++){
+							classification.add(new Classification(
+									items.get(i)[1],
+									Constants.DB_DATE_FORMAT.parse(items.get(i)[2]).getTime(),
+									Constants.DB_DATE_FORMAT.parse(items.get(i)[3]).getTime()));
 						}
-						
 
-						//					if (classifications.isEmpty()) {
-						//						adapter.clear();
-						//					} else
-						//						if (!adapter.isEmpty()) {
-						//							final Classification myLast = adapter.getItem(adapter.getCount() - 1);
-						//							final Classification expected = classifications.get(adapter.getCount() - 1);
-						//
-						//							if (myLast.getClassification().equals(expected.getClassification())) {
-						//								myLast.updateEnd(expected.getEnd());
-						//								adapter.notifyDataSetChanged();
-						//							} else {
-						//								adapter.clear();
-						//							}
-
-						//						}
-
+						for (int i = 1; i <= classification.size(); i++) {
+							Classification c = classification.get(classification.size()-i);
+							if (c!=null)
+								c = c.withContext(ActivityListActivity.this);
+							if (c!=null)
+								adapter.add(c);
+						}
 
 
 						String lastActivity = activityQuery.getItemNameFromActivityTable(count);
 						String lastActivityStartDate = activityQuery.getItemStartDateFromActivityTable(count);
 						String lastActivityEndDate = activityQuery.getItemEndDateFromActivityTable(count);
-						SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z");
 						Classification topClassification = null;
 						if (!adapter.isEmpty()) {
 							topClassification = adapter.getItem(0); 
@@ -320,22 +286,16 @@ public class ActivityListActivity extends Activity {
 						if(lastActivity!=null && !topClassification.getClassification().equals(lastActivity)) {
 							Classification lastActivityClass = new Classification(
 									lastActivity,
-									dateFormat.parse(lastActivityStartDate).getTime(),
-									dateFormat.parse(lastActivityEndDate).getTime());
+									Constants.DB_DATE_FORMAT.parse(lastActivityStartDate).getTime(),
+									Constants.DB_DATE_FORMAT.parse(lastActivityEndDate).getTime());
 							lastActivityClass = lastActivityClass.withContext(ActivityListActivity.this);
 							Log.v(Constants.DEBUG_TAG, "Inserting activity: "+lastActivityClass.getNiceClassification()+", prev="+topClassification);
 							adapter.insert(lastActivityClass,0);
 						}else{
-							adapter.getItem(0).updateEnd(dateFormat.parse(lastActivityEndDate).getTime());
+							adapter.getItem(0).updateEnd(Constants.DB_DATE_FORMAT.parse(lastActivityEndDate).getTime());
 							adapter.notifyDataSetChanged();
 						}
-						Log.i("test",classifications.size()+" HERE2");
-						Log.i("test",adapter.getCount()+" HERE3");
-						//					for (int i = adapter.getCount(); i < classifications.size(); i++) {
-						////						adapter.insert(classifications.get(i).withContext(ActivityListActivity.this),0);
-						//						adapter.add(classifications.get(i).withContext(ActivityListActivity.this));
-						//					}
-
+						
 					}
 				}
 				prevServiceRunning = isServiceRunning;
