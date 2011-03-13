@@ -354,7 +354,7 @@ public class ActivityChartActivity extends Activity {
 			
 			Log.v(Constants.DEBUG_TAG, "Update Chart UI");
 			
-			
+			/*
 			int activitySize = activityQuery.getSizeOfTable();
 			Log.i("time",activitySize+"");
 
@@ -396,6 +396,7 @@ public class ActivityChartActivity extends Activity {
 			textView2.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
 			textView3.setText(" Now    : " + newNiceText +" "+newDurationText);
 			textView4.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
+			*/
 
 			flipper.startFlipping();
 			flipper.stopFlipping();

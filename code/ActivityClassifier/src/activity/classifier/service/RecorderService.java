@@ -15,6 +15,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,10 @@ import activity.classifier.accel.sync.SyncSampler;
 import activity.classifier.aggregator.Aggregator;
 import activity.classifier.common.Constants;
 import activity.classifier.common.ExceptionHandler;
+import activity.classifier.db.ActivitiesTable;
+import activity.classifier.db.DebugDataTable;
+import activity.classifier.db.OptionsTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.model.ModelReader;
 import activity.classifier.repository.ActivityQueries;
 import activity.classifier.repository.OptionQueries;
@@ -92,7 +97,6 @@ import android.widget.Toast;
 public class RecorderService extends Service implements Runnable {
 	
 	private Sampler sampler;
-	private final Aggregator aggregator = new Aggregator();
 	
 	private boolean charging = false;
 	
@@ -106,29 +110,30 @@ public class RecorderService extends Service implements Runnable {
 
 	private UploadActivityHistoryThread uploadActivityHistory;
 
-	private OptionQueries optionQuery;
-	private ActivityQueries activityQuery;
-	private TestAVQueries testavQueries;
+	private SqlLiteAdapter sqlLiteAdapter;
+	private OptionsTable optionsTable;
+	private DebugDataTable debugDataTable;
+	private ActivitiesTable activitiesTable;
+//	private ActivityQueries activityQuery;
 
 	private boolean running;
 
 	public static Map<Float[], String> model;
-
-	private final List<Classification> classifications = new ArrayList<Classification>();
-
+	
 	private Boolean SCREEN_DIM_WAKE_LOCK_MANAGER_IsAcquired = false;
 	private Boolean PARTIAL_WAKE_LOCK_MANAGER_IsAcquired = false;
 
 	private PowerManager pm;
 
 	private final List<Classification> adapter = new ArrayList<Classification>();
-	private String lastAc = "NONE";
 
 	private PhoneInfo phoneInfo;
 	
 	private SampleBatchBuffer batchBuffer;
 	private ClassifierThread classifierThread;
 	private AccountThread registerAccountThread;
+	
+	private Classification latestClassification;
 	
 	/**
 	 * broadcastReceiver that receive phone's screen state
@@ -246,7 +251,7 @@ public class RecorderService extends Service implements Runnable {
 		}
 
 		public List<Classification> getClassifications() throws RemoteException {
-			return classifications;
+			return Collections.emptyList();
 		}
 
 		public boolean isRunning() throws RemoteException {
@@ -255,8 +260,7 @@ public class RecorderService extends Service implements Runnable {
 
 		public void setWakeLock() throws RemoteException {
 			Log.i("Wakelock", "GOt messege setWakelock from Setting");
-			optionQuery.load();
-			boolean wakelock = optionQuery.isWakeLockSet();
+			boolean wakelock = optionsTable.isWakeLockSet();
 			Log.i("Wakelock", " " + wakelock);
 			applyWakeLock(wakelock);
 
@@ -329,76 +333,71 @@ public class RecorderService extends Service implements Runnable {
 	};
 	
 
+	private void updateScores(long sampleTime, String best) {
+		
+		if (latestClassification!=null
+				&& best.equals(latestClassification.getClassification())) {
+			latestClassification.setEnd(sampleTime);
+			activitiesTable.update(latestClassification);
+		} else {
+			if (latestClassification==null) {
+				latestClassification = new Classification(best, sampleTime);
+			} else {
+				latestClassification.setClassification(best);
+				latestClassification.setStart(sampleTime);
+				latestClassification.setEnd(sampleTime);
+			}
+			
+			activitiesTable.insert(latestClassification);
+		}
+		
+		if (Constants.OUTPUT_DEBUG_INFO) {
+			debugDataTable.updateFinalSystemOutput(sampleTime, best);
+		}
+		
+//		try {
+//			insertNewActivity();
+//		} catch (ParseException e) {
+//			e.printStackTrace();
+//		}
+	}
+	
 
 	/**
 	 * 
 	 * @throws ParseException
 	 */
-	private void insertNewActivity() throws ParseException {
-		try {
-			Classification c = classifications.get(classifications.size()-1);
-			if (c==null)
-				return;
-			c = c.withContext(this);
-			if (c==null)
-				return;
-			
-			//String activity = c.getNiceClassification();
-			String activity = c.getClassification();
-			String startDate  = c.getStartTime();
-
-			if(activity!=null && !lastAc.equals(activity)){
-				Log.i("classification",activity);
-				int count = activityQuery.getSizeOfTable();
-				if(count>0 && !ActivityQueries.ACTIVITY_END.equals(activityQuery.getItemNameFromActivityTable(count))){
-					activityQuery.updateNewItems(count, startDate);
-				}
-				activityQuery.insertActivities(activity, startDate, 0);
-
-			}else{
-				int count = activityQuery.getSizeOfTable();
-				activityQuery.updateNewItems(count, classifications.get(classifications.size()-1).getEndTime());
-			}
-
-			lastAc=activity;
-		} catch (Exception ex) {
-			Log.e(getClass().getName(), "Unable to get service state", ex);
-		} 
-		
-	}
-	
-	private void updateScores(long sampleTime, String newClassification) {
-		
-		String best = "";
-		
-		if (optionQuery.getUseAggregator()) {
-			aggregator.addClassification(newClassification);
-			String aggrClassification = aggregator.getClassification();
-			if (aggrClassification!=null && !ActivityQueries.isSystemActivity(aggrClassification)) {
-				best = aggrClassification;
-				
-				if (!classifications.isEmpty()
-						&& best.equals(classifications.get(classifications.size() - 1).getClassification())) {
-					classifications.get(classifications.size() - 1).updateEnd(System.currentTimeMillis());
-				} else {
-					classifications.add(new Classification(best, System.currentTimeMillis()));
-				}
-			}
-		} else {
-			best = newClassification;
-			classifications.add(new Classification(best, System.currentTimeMillis()));
-		}
-		
-		if (Constants.OUTPUT_DEBUG_INFO) {
-			testavQueries.updateFinalClassification(sampleTime, best);
-		}
-		
-		try {
-			insertNewActivity();
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
-	}
+//	private void insertNewActivity() throws ParseException {
+//		try {
+//			Classification c = classifications.get(classifications.size()-1);
+//			if (c==null)
+//				return;
+//			c.withContext(this);
+//			if (c==null)
+//				return;
+//			
+//			//String activity = c.getNiceClassification();
+//			String activity = c.getClassification();
+//			String startDate  = c.getStartTime();
+//
+//			if(activity!=null && !lastAc.equals(activity)){
+//				Log.i("classification",activity);
+//				int count = activityQuery.getSizeOfTable();
+//				if(count>0 && !ActivityQueries.ACTIVITY_END.equals(activityQuery.getItemNameFromActivityTable(count))){
+//					activityQuery.updateNewItems(count, startDate);
+//				}
+//				activityQuery.insertActivities(activity, startDate, 0);
+//
+//			}else{
+//				int count = activityQuery.getSizeOfTable();
+//				activityQuery.updateNewItems(count, classifications.get(classifications.size()-1).getEndTime());
+//			}
+//
+//			lastAc=activity;
+//		} catch (Exception ex) {
+//			Log.e(getClass().getName(), "Unable to get service state", ex);
+//		} 
+//	}
 	
 	/**
 	 * 
@@ -476,7 +475,8 @@ public class RecorderService extends Service implements Runnable {
 	/**
 	 * This code is run in the service's separate thread.
 	 * The code is used to initialise all the features of the
-	 * 	service when the service starts running. 
+	 * 	service when the service starts running, then set
+	 * the state of the service to running state.
 	 */
 	private void initService()
 	{
@@ -489,37 +489,44 @@ public class RecorderService extends Service implements Runnable {
 		this.registerReceiver(this.myScreenReceiver, new IntentFilter(Intent.ACTION_SCREEN_OFF));
 		this.registerReceiver(this.myScreenReceiver, new IntentFilter(Intent.ACTION_SCREEN_ON));
 		
+		sqlLiteAdapter = SqlLiteAdapter.getInstance(this);
+		optionsTable = sqlLiteAdapter.getOptionsTable();
+		debugDataTable = sqlLiteAdapter.getDebugDataTable();
+		activitiesTable = sqlLiteAdapter.getActivitiesTable();
+		
 		model = ModelReader.getModel(this, R.raw.basic_model);
 		phoneInfo = new PhoneInfo(this);
-		activityQuery = new ActivityQueries(this);
-		optionQuery = new OptionQueries(this);
-		testavQueries = new TestAVQueries(this);
 		batchBuffer = new SampleBatchBuffer();
 		
-		//	load options from DB
-		optionQuery.load();
+		latestClassification = null;
+		
 		
 //		optionQuery.setServiceRunningState(true);
-		applyWakeLock(optionQuery.isWakeLockSet());
+		applyWakeLock(optionsTable.isWakeLockSet());
 //		optionQuery.save();
+		
 		/*
 		 * if the background service is dead somehow last time, there is no clue when the service is finished.
 		 * Check the last activity name whether it's finished properly or not by the activity name "END",
 		 * then if it was not "END", then insert "END" data into the database with the end time of the last activity. 
 		 */
-		int count = activityQuery.getSizeOfTable();
-        Log.i("countActivityTable","#"+count);
-        if(count > 0){
-	    	String lastActivity = activityQuery.getItemNameFromActivityTable(count);
-	    	if(!ActivityQueries.ACTIVITY_END.equals(lastActivity)){
-	    		String endDate = activityQuery.getItemEndDateFromActivityTable(count);
-	    		
-	    		activityQuery.insertActivities(ActivityQueries.ACTIVITY_END, endDate, 0);
-	    	}
-        }else if (count==0){
-        	Date date = new Date();
-        	activityQuery.insertActivities(ActivityQueries.ACTIVITY_END, Constants.DB_DATE_FORMAT.format(date), 0);
-        }
+		{
+			Classification lastClassification = new Classification();
+			//	load the latest classification available (false if the database is empty)
+			if (activitiesTable.loadLatest(lastClassification)) {
+		    	if(!ActivitiesTable.ACTIVITY_END.equals(lastClassification.getClassification())){
+		    		// the beginning of the new activity is the end of the last + 1,
+		    		//	we have to add one because if the end of the last activity is the same as its beginning (no duration passed)
+		    		//	then having another activity with the same start throws an exception in the INSERT statement
+		    		long start = lastClassification.getEnd() + 1;
+		    		Classification endClass = new Classification(ActivitiesTable.ACTIVITY_END, start);
+		    		activitiesTable.insert(endClass);
+		    	}
+			} else {
+	    		Classification endClass = new Classification(ActivitiesTable.ACTIVITY_END, System.currentTimeMillis());
+	    		activitiesTable.insert(endClass);
+			}
+		}
         
         AsyncAccelReader reader = new AsyncAccelReaderFactory().getReader(this);
 		sampler = new AsyncSampler(handler, reader, analyseRunnable);
@@ -532,28 +539,23 @@ public class RecorderService extends Service implements Runnable {
 		
 		// if the account wasn't previously sent,
 		// start a thread to register the account.
-		if (!optionQuery.isAccountSent()) {
-			registerAccountThread = new AccountThread(this, binder, phoneInfo, optionQuery);
+		if (!optionsTable.isAccountSent()) {
+			registerAccountThread = new AccountThread(this, binder, phoneInfo);
 			registerAccountThread.start();
 		} else {
 			registerAccountThread = null;
 		}
 
 		// start to upload un-posted activities to Web server
-		uploadActivityHistory = new UploadActivityHistoryThread(this, activityQuery, phoneInfo);		
+		uploadActivityHistory = new UploadActivityHistoryThread(this, phoneInfo);		
 		uploadActivityHistory.startUploads();
 		
-		//TODO: CHANGE THIS BEFORE COMMIT
 		handler.postDelayed(registerRunnable, Constants.DELAY_SAMPLE_BATCH);
-		//handler.postDelayed(registerRunnable, 1000);
-
-		// classifications.add(new Classification("CLASSIFIED/WAITING",
-		// System.currentTimeMillis()));
-		// classifications.add(new Classification("",
-		// System.currentTimeMillis()));		
-		optionQuery.load();
-		optionQuery.setServiceStartedState(true);
-		optionQuery.save();
+	
+		//	if the service started successfully, then start set the system to show
+		//		that the service started
+		optionsTable.setServiceStarted(true);
+		optionsTable.save();
 	}
 
 	/**
@@ -575,12 +577,10 @@ public class RecorderService extends Service implements Runnable {
 			registerAccountThread.exit();
 		}
 		
-		Date date = new Date(System.currentTimeMillis());
-		String startTime = Constants.DB_DATE_FORMAT.format(date);
-		
 		// save message "END" to recognise when the background service is
 		// finished.
-		activityQuery.insertActivities(ActivityQueries.ACTIVITY_END, startTime, 0);
+		Classification endClass = new Classification(ActivitiesTable.ACTIVITY_END, System.currentTimeMillis());
+		activitiesTable.insert(endClass);
 		MainTabActivity.serviceIsRunning = false;
 		
 		this.unregisterReceiver(myBatteryReceiver);

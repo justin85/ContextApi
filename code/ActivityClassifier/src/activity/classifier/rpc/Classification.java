@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import activity.classifier.common.Constants;
+import activity.classifier.db.ActivitiesTable;
 import activity.classifier.repository.ActivityQueries;
 import android.content.Context;
 import android.os.Parcel;
@@ -20,53 +21,103 @@ import android.util.Log;
  *
  * @author chris
  */
-public class Classification implements Parcelable {
-
+public class Classification implements Parcelable, Comparable<Classification> {
+	
 	private CharSequence niceClassification;
 	private String startTime;
 	private String endTime;
 	private String duration="";
-	private final String classification;
-	private final long start;
+	private String classification;
+	private long start;
 	private long end;
+	private boolean isChecked;
+	private long lastUpdate;
 	
-	public Classification(final String classification, final long start) {
+	public Classification() {
+		this.classification = "";
+		this.start = 0;
+		this.end = 0;
+		this.isChecked = false;
+	}
+	
+	public Classification(String classification, long start) {
 		this.classification = classification;
 		if (this.classification==null)
 			throw new RuntimeException("Invalid classification with classification name as NULL");
 		this.start = start;
 		this.end = start;
+		this.isChecked = false;
+		
+		computeDuration();
 	}
-	public Classification(final String classification, final long start, final long end) {
+	
+	public Classification(String classification, long start, long end) {
 		this.classification = classification;
 		if (this.classification==null)
 			throw new RuntimeException("Invalid classification with classification name as NULL");
 		this.start = start;
 		this.end = end;
+		this.isChecked = false;
+		
+		computeDuration();
 	}
+	
+	private void computeDuration() {
+		//        final String duration;
+		int length = (int) ((end - start) / 1000);
 
-	public void updateEnd(final long end) {
-		this.end = end;
+		if (length < 60) {
+			duration = "<1 min";
+		} else if (length < 60 * 60) {
+			duration = (length / 60) + " mins";
+		} else {
+			duration = (length / (60 * 60)) + " hrs";
+		}
 	}
+	
 
 	public String getStartTime(){
 		return startTime;
 	}
+	
 	public String getEndTime(){
 		return endTime;
 	}
+	
 	public String getDuration(){
 		return duration;
 	}
+	
 	public String getNiceClassification(){
 		return (String) niceClassification;
 	}
+	
 	public int describeContents() {
 		return 0;
 	}
-
+	
+	/**
+	 * @param classification the classification to set
+	 */
+	public void setClassification(String classification) {
+		this.classification = classification;
+	}
+	
 	public String getClassification() {
 		return classification;
+	}
+
+	/**
+	 * @param start the start to set
+	 */
+	public void setStart(long start) {
+		this.start = start;
+		computeDuration();
+	}
+	
+	public void setEnd(long end) {
+		this.end = end;
+		computeDuration();
 	}
 
 	public long getEnd() {
@@ -76,21 +127,38 @@ public class Classification implements Parcelable {
 	public long getStart() {
 		return start;
 	}
+	
+	/**
+	 * @return the isChecked
+	 */
+	public boolean isChecked() {
+		return isChecked;
+	}
+
+	/**
+	 * @param isChecked the isChecked to set
+	 */
+	public void setChecked(boolean isChecked) {
+		this.isChecked = isChecked;
+	}
+	
+	/**
+	 * @return the lastUpdate
+	 */
+	public long getLastUpdate() {
+		return lastUpdate;
+	}
+
+	/**
+	 * @param lastUpdate the lastUpdate to set
+	 */
+	public void setLastUpdate(long lastUpdate) {
+		this.lastUpdate = lastUpdate;
+	}
 
 	@Override 
 	public String toString() {
-		//        final String duration;
-		final int length = (int) ((end - start) / 1000);
-
-		if (length < 60) {
-			duration = "<1 min";
-		} else if (length < 60 * 60) {
-			duration = (length / 60) + " mins";
-		} else {
-			duration = (length / (60 * 60)) + " hrs";
-		}
-
-		if (ActivityQueries.isSystemActivity(classification)) {
+		if (ActivitiesTable.isSystemActivity(classification)) {
 			return niceClassification+"";
 		}
 		else{
@@ -104,7 +172,7 @@ public class Classification implements Parcelable {
 		arg0.writeLong(end);
 	}
 
-	public Classification withContext(final Context context) {
+	public void withContext(Context context) {
 		if (classification==null) {
 			throw new RuntimeException("No classification exists");
 		}
@@ -116,8 +184,6 @@ public class Classification implements Parcelable {
 
 		startTime = Constants.DB_DATE_FORMAT.format(date);
 		endTime = Constants.DB_DATE_FORMAT.format(enddate);
-		
-		return this;
 	}
 	
 	public static String getNiceName(Context context, String classification)
@@ -145,7 +211,7 @@ public class Classification implements Parcelable {
 
 		public Classification createFromParcel(Parcel arg0) {
 			final Classification res = new Classification(arg0.readString(), arg0.readLong());
-			res.updateEnd(arg0.readLong());
+			res.setEnd(arg0.readLong());
 			return res;
 		}
 
@@ -154,5 +220,10 @@ public class Classification implements Parcelable {
 		}
 
 	};
+
+	@Override
+	public int compareTo(Classification another) {
+		return (int)(this.start-another.start);
+	}
 
 }

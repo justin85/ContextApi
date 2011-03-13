@@ -9,9 +9,14 @@ import java.util.Arrays;
 
 import activity.classifier.accel.SampleBatch;
 import activity.classifier.accel.SampleBatchBuffer;
+import activity.classifier.aggregator.Aggregator;
 import activity.classifier.classifier.Classifier;
 import activity.classifier.classifier.KnnClassifier;
 import activity.classifier.common.Constants;
+import activity.classifier.db.ActivitiesTable;
+import activity.classifier.db.DebugDataTable;
+import activity.classifier.db.OptionsTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.repository.OptionQueries;
 import activity.classifier.repository.TestAVQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
@@ -63,8 +68,9 @@ public class ClassifierThread extends Thread {
 	private ActivityRecorderBinder service;
 	private SampleBatchBuffer batchBuffer;
 	
-	private OptionQueries optionQuery;
-	private TestAVQueries testavQuery;
+	private SqlLiteAdapter sqlLiteAdapter;
+	private OptionsTable optionsTable;
+	private DebugDataTable debugDataTable;
 
 	private CalcStatistics rawSampleStatistics = new CalcStatistics(Constants.ACCEL_DIM);
 	
@@ -73,6 +79,7 @@ public class ClassifierThread extends Thread {
 	
 	private RotateSamplesToVerticalHorizontal rotateSamples = new RotateSamplesToVerticalHorizontal();
 	private Classifier classifier;
+	private Aggregator aggregator;
 
 	private boolean isCalibrated;
 	private Calibrator calibrator;
@@ -86,28 +93,21 @@ public class ClassifierThread extends Thread {
 		this.service = service;
 		this.batchBuffer = sampleBatchBuffer;
 		
-		testavQuery = new TestAVQueries(context);
+		this.sqlLiteAdapter = SqlLiteAdapter.getInstance(context);
+		this.optionsTable = sqlLiteAdapter.getOptionsTable();
+		this.debugDataTable = sqlLiteAdapter.getDebugDataTable();
 
 		this.classifier = new KnnClassifier(RecorderService.model.entrySet());
-		this.optionQuery = new OptionQueries(context);
+		this.aggregator = new Aggregator();
 		
-		this.optionQuery.load();
 		calibrator = new Calibrator(
 				service, 
-				this.optionQuery.isCalibrated(),
-				this.optionQuery.getAllowedMultiplesOfDeviation(),
-				this.optionQuery.getCount(),
-				new float[] {
-					this.optionQuery.getStandardDeviationX(),
-					this.optionQuery.getStandardDeviationY(),
-					this.optionQuery.getStandardDeviationZ(),
-				},
-				new float[] {
-					this.optionQuery.getMeanX(),
-					this.optionQuery.getMeanY(),
-					this.optionQuery.getMeanZ(),
-				},
-				this.optionQuery.getValueOfGravity()
+				this.optionsTable.isCalibrated(),
+				this.optionsTable.getAllowedMultiplesOfSd(),
+				this.optionsTable.getCount(),
+				this.optionsTable.getSd().clone(),
+				this.optionsTable.getMean().clone(),
+				this.optionsTable.getValueOfGravity()
 			);
 		
 		this.shouldExit = false;
@@ -180,7 +180,18 @@ public class ClassifierThread extends Thread {
 		boolean chargingState = false;//batch.isCharging();
 		
 		if (Constants.OUTPUT_DEBUG_INFO) {
-			testavQuery.reset(sampleTime);
+			debugDataTable.reset(sampleTime);
+		}
+		
+		//	take out accelerometer axis offsets
+		if (calibrator.isCalibrated()) {
+			float[] axisMeans = optionsTable.getMean();
+			float gravity = optionsTable.getValueOfGravity();
+			for (int i=0; i<size; ++i) {
+				data[i][Constants.ACCEL_X_AXIS] -= axisMeans[Constants.ACCEL_X_AXIS]; 
+				data[i][Constants.ACCEL_Y_AXIS] -= axisMeans[Constants.ACCEL_Y_AXIS];
+				data[i][Constants.ACCEL_Z_AXIS] -= (axisMeans[Constants.ACCEL_Z_AXIS] - gravity);
+			}
 		}
 		
 		rawSampleStatistics.assign(data, size);
@@ -191,10 +202,16 @@ public class ClassifierThread extends Thread {
 		float[] dataSd = rawSampleStatistics.getStandardDeviation();
 		
 		if (Constants.OUTPUT_DEBUG_INFO) {
-			testavQuery.setUnrotatedMeans(
+			debugDataTable.setUnrotatedStats(
 					dataMeans[Constants.ACCEL_X_AXIS],
 					dataMeans[Constants.ACCEL_Y_AXIS],
-					dataMeans[Constants.ACCEL_Z_AXIS]
+					dataMeans[Constants.ACCEL_Z_AXIS],
+					dataSd[Constants.ACCEL_X_AXIS],
+					dataSd[Constants.ACCEL_Y_AXIS],
+					dataSd[Constants.ACCEL_Z_AXIS],
+					dataMax[Constants.ACCEL_X_AXIS]-dataMin[Constants.ACCEL_X_AXIS],
+					dataMax[Constants.ACCEL_Y_AXIS]-dataMin[Constants.ACCEL_Y_AXIS],
+					dataMax[Constants.ACCEL_Z_AXIS]-dataMin[Constants.ACCEL_Z_AXIS]
 					          );
 		}
 		
@@ -206,17 +223,12 @@ public class ClassifierThread extends Thread {
 			float[] sd = calibrator.getSd();
 			float[] mean = calibrator.getMean();
 			
-			optionQuery.load();
-			optionQuery.setCalibrationState(true);
-			optionQuery.setMeanX(mean[Constants.ACCEL_X_AXIS]);
-			optionQuery.setMeanY(mean[Constants.ACCEL_Y_AXIS]);
-			optionQuery.setMeanZ(mean[Constants.ACCEL_Z_AXIS]);
-			optionQuery.setStandardDeviationX(sd[Constants.ACCEL_X_AXIS]);
-			optionQuery.setStandardDeviationY(sd[Constants.ACCEL_Y_AXIS]);
-			optionQuery.setStandardDeviationZ(sd[Constants.ACCEL_Z_AXIS]);
-			optionQuery.setCount(calibrator.getCount());
-			optionQuery.setValueOfGravity(calibrator.getValueOfGravity());
-			optionQuery.save();
+			optionsTable.setCalibrated(true);
+			optionsTable.setMean(mean);
+			optionsTable.setSd(sd);
+			optionsTable.setCount(calibrator.getCount());
+			optionsTable.setValueOfGravity(calibrator.getValueOfGravity());
+			optionsTable.save();
 			
 			isCalibrated = true;
 		}
@@ -241,41 +253,56 @@ public class ClassifierThread extends Thread {
 					
 					if (Constants.OUTPUT_DEBUG_INFO) {
 						logRotatedValues(dataMeans, data, size);
-						testavQuery.setClassifierAlgoOutput(classification);
+						debugDataTable.setClassifierAlgoOutput(classification);
+					}
+					
+					if (optionsTable.getUseAggregator()) {
+						aggregator.addClassification(classification);
+						String aggrClassification = aggregator.getClassification();
+						if (aggrClassification!=null && !ActivitiesTable.isSystemActivity(aggrClassification)) {
+							classification = aggrClassification;
+						}
+
+						if (Constants.OUTPUT_DEBUG_INFO) {
+							debugDataTable.setAggregatorAlgoOutput(aggrClassification);
+						}
+					} else {
+						if (Constants.OUTPUT_DEBUG_INFO) {
+							debugDataTable.setAggregatorAlgoOutput("NOT USING AGGREGATOR");
+						}
 					}
 					
 				} else {
 					Log.v(Constants.DEBUG_TAG, "Unable to perform classification, data could not be rotated!");
 					if (Constants.OUTPUT_DEBUG_INFO) {
-						testavQuery.setClassifierAlgoOutput("ERROR: Unable to rotate gravity "+Arrays.toString(dataMeans));
+						debugDataTable.setClassifierAlgoOutput("ERROR: Unable to rotate gravity "+Arrays.toString(dataMeans));
 					}
 				}
 			} else {
 				if (Constants.OUTPUT_DEBUG_INFO) {
-					testavQuery.setClassifierAlgoOutput("ERROR: Gravity "+calcGravity+" not within limits: ["+minGravity+","+maxGravity+"]");
+					debugDataTable.setClassifierAlgoOutput("ERROR: Gravity "+calcGravity+" not within limits: ["+minGravity+","+maxGravity+"]");
 				}
 			}
-
-		}
-		
-		if (calibrator.isUncarried()) {
-//			if (classification.contains("TRAVELLING"))
-//				return "CLASSIFIED/UNCARRIED/TRAVELLING";
-//			else
-				return "CLASSIFIED/UNCARRIED";
 		}
 		
 		if (chargingState) {
 			if (classification.contains("TRAVELLING"))
-				return "CLASSIFIED/CHARGING/TRAVELLING";
+				classification = "CLASSIFIED/CHARGING/TRAVELLING";
 			else
-				return "CLASSIFIED/CHARGING";
+				classification = "CLASSIFIED/CHARGING";
+		} else {
+			if (calibrator.isUncarried()) {
+//				if (classification.contains("TRAVELLING"))
+//					return "CLASSIFIED/UNCARRIED/TRAVELLING";
+//				else
+					classification = "CLASSIFIED/UNCARRIED";
+			}
 		}
 		
 		if (Constants.OUTPUT_DEBUG_INFO) {
-			testavQuery.setFinalClassifierOutput(classification);
-			testavQuery.deleteTestValuesBefore(System.currentTimeMillis()-(24L*60L*60L*1000L));
-			testavQuery.insertTestValues();
+			debugDataTable.setFinalClassifierOutput(classification);
+			debugDataTable.trim();
+			debugDataTable.insert();
 		}
 		
 		return classification;
@@ -297,7 +324,7 @@ public class ClassifierThread extends Thread {
 		float[] rotatedMeans = rotatedMergedSampleStatistics.getMean();
 		float[] rotatedSd = rotatedMergedSampleStatistics.getStandardDeviation();
 		
-		testavQuery.setRotatedStats(
+		debugDataTable.setRotatedStats(
 				rotatedMeans[0],
 				rotatedMeans[1],
 				

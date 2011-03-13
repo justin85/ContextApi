@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -20,7 +21,10 @@ import org.apache.http.entity.FileEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import activity.classifier.common.Constants;
+import activity.classifier.db.ActivitiesTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.repository.ActivityQueries;
+import activity.classifier.rpc.Classification;
 import activity.classifier.utils.PhoneInfo;
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -41,27 +45,39 @@ import android.util.Log;
  *
  */
 public class UploadActivityHistoryThread extends Thread {
+	
+	private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	private static final DateFormat df1 = new SimpleDateFormat("Z z");
 
 	protected AccountManager accountManager;
 
+	private SqlLiteAdapter sqlLiteAdapter;
+	private ActivitiesTable activitiesTable;
+	
 	private boolean shouldExit;
 	private PhoneInfo phoneInfo;
-	private ActivityQueries activityQuery;
 	private boolean uploading;		//	is the thread currently uploading (to avoid interrupting)
 	private long lastUploadTime;	//	last time data was uploaded
+	
+	//	reusable stuff
+	private StringBuilder htmlMessage = new StringBuilder();
+	private List<Long> processed = new ArrayList<Long>();
+	private Classification classification = new Classification();
+	private Date tempdate = new Date();
 
 	/**
-	 * Initialise {@link ActivityQueries} class instance.
-	 * @param context context from Activity or Service classes passes to {@link ActivityQueries} class instance.
+	 * 
+	 * @param context context from Activity or Service classes
 	 */
-	public UploadActivityHistoryThread(Context context, ActivityQueries activityQuery, PhoneInfo phoneInfo) {
+	public UploadActivityHistoryThread(Context context, PhoneInfo phoneInfo) {
     	super(UploadActivityHistoryThread.class.getName());
     	
-		this.activityQuery = activityQuery;
+    	this.sqlLiteAdapter = SqlLiteAdapter.getInstance(context);
+		this.activitiesTable = sqlLiteAdapter.getActivitiesTable();
+		
 		this.phoneInfo = phoneInfo;
-
-		String dbfile = Constants.PATH_ACTIVITY_RECORDS_FILE;
-		copy(Constants.PATH_ACTIVITY_RECORDS_DB,dbfile);
+		
+		copy(Constants.PATH_ACTIVITY_RECORDS_DB, Constants.PATH_ACTIVITY_RECORDS_FILE);
 	}
 
 	/**
@@ -80,7 +96,7 @@ public class UploadActivityHistoryThread extends Thread {
 	}
 
 	/**
-	 * By using {@link ActivityQueries} class, check every un-sent activities from device repository,
+	 * By using {@link ActivitiesTable} class, check every un-sent activities from device repository,
 	 * and upload un-sent activities from device repository to Web server.
 	 * Timer scheduler is set to every 5 min.
 	 *
@@ -125,7 +141,6 @@ public class UploadActivityHistoryThread extends Thread {
 				uploadData(accountName);
 				uploading = false;
 				lastUploadTime = currentTime;
-				Log.i("upload","ok");
 			}
 		}
 
@@ -141,97 +156,60 @@ public class UploadActivityHistoryThread extends Thread {
 		final File file = new File(Constants.PATH_ACTIVITY_RECORDS_FILE);
 		final FileEntity entity = new FileEntity(file, "text/plain");
 
-		// ArrayList data type for un-sent activities.
-		ArrayList<String> itemNames = new ArrayList<String>();
-		ArrayList<String> itemStartDates = new ArrayList<String>();
-		ArrayList<String> itemEndDates = new ArrayList<String>();
-		ArrayList<Integer> itemIDs = new ArrayList<Integer>();
-		
-		//open database and check the un-posted data
-		activityQuery.getUncheckedItemsFromActivityTable(0);
-
-		itemIDs = activityQuery.getUncheckedItemIDs();
-		itemNames = activityQuery.getUncheckedItemNames();
-		itemStartDates = activityQuery.getUncheckedItemStartDates();
-		itemEndDates = activityQuery.getUncheckedItemEndDates();
-
-		//get the number of un-posted activities
-		int size=activityQuery.getUncheckedItemsSize();
-
-		Log.i("uncheckedItems",size+"");
-
 		/*
 		 * if there are un-posted activities in the device repository,
 		 * then merge every information of activity into one string(message),
 		 * then upload to Web server.
 		 */
-		if(size!=0){
-			String message = "";
-			DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-			DateFormat df1 = new SimpleDateFormat("Z z");
-			//merge information of activities
-			for(int i = 0 ; i<size;i++){
-				Date tempdate;
-				try {
-					tempdate = df.parse(itemStartDates.get(i));
-
-					if(i==size){
-						message +=  itemNames.get(i)+"&&"+itemStartDates.get(i)+"&&"+df1.format(tempdate);
-					}else{
-						message +=  itemNames.get(i)+"&&"+itemStartDates.get(i)+"&&"+df1.format(tempdate)+"##";
-					}
-				} catch (ParseException e) {
-					e.printStackTrace();
-				}
-
-		    }
-		    
-		    //send un-posted activities with the size, date, and Google account to Web server.
-		    try {
-		    	
-		    	
-		    	Date systemdate = Calendar.getInstance().getTime();
-		    	String reportDate = df.format(systemdate);
-		    	post.setHeader("sysdate",reportDate);
-		    	post.setHeader("size",size+"");
-	  	        post.setHeader("message", message);
-	  	        post.setHeader("UID", accountName);
-	  	        post.setEntity(entity);
-	   	    	
-	  	        int code = new DefaultHttpClient().execute(post).getStatusLine().getStatusCode();
-		        Log.i("m",message);
-		        ArrayList<String[]> items = new ArrayList<String[]>();
-		        for(int i=0;i<size;i++){
-		        	String[] tempItmes = {itemIDs.get(i)+"", itemNames.get(i), itemStartDates.get(i),itemEndDates.get(i), "1"};
-		        	items.add(tempItmes);
-		        }
-		        activityQuery.updateUncheckedItems(items);
-		        // update un-posted items to posted in device repository.
-//		        for(int i=0;i<size;i++){
-//		        	activityQuery.updateUncheckedItems(itemIDs.get(i), itemNames.get(i), itemStartDates.get(i),itemEndDates.get(i), 1);
-//        		}
-            // if any failure of the response
-		    } catch (Exception ex) {
-	            	Log.e(getClass().getName(), "Unable to upload sensor logs", ex);
-		    } 
-		   
-		    itemIDs.clear();
-		    itemNames.clear();
-		    itemStartDates.clear();
-		    itemEndDates.clear();
-	    }	
+		activitiesTable.loadUnchecked(classification, new ActivitiesTable.ClassificationDataCallback() {
+			boolean first = false;
+			
+			@Override
+			public void onRetrieve(Classification cl) {
+				if (!first)
+					htmlMessage.append("##");
+				else
+					first = false;
+				tempdate.setTime(cl.getStart());
+				htmlMessage.append(cl.getClassification()+"&&"+cl.getStartTime()+"&&"+df1.format(tempdate));
+				processed.add(cl.getStart());
+			}
+		});
+		
+	    //send un-posted activities with the size, date, and Google account to Web server.
+	    try {
+	    	Date systemdate = Calendar.getInstance().getTime();
+	    	String reportDate = df.format(systemdate);
+	    	post.setHeader("sysdate",reportDate);
+	    	post.setHeader("size",Integer.toString(processed.size()));
+  	        post.setHeader("message", htmlMessage.toString());
+  	        post.setHeader("UID", accountName);
+  	        post.setEntity(entity);
+   	    	
+  	        int code = new DefaultHttpClient().execute(post).getStatusLine().getStatusCode();
+  	        
+  	        for (Long st:processed) {
+  	        	activitiesTable.updateChecked(st);
+  	        }
+	    } catch (Exception ex) {
+            Log.e(getClass().getName(), "Unable to upload sensor logs", ex);
+	    } 
+	    
+		htmlMessage.setLength(0);
+		processed.clear();
+		
 	}
 
 	/**
 	 * A utility method which copy the database to SD card.
-	 * @param targetFile database in the device repository.
-	 * @param copyFile path to be copied
+	 * @param srcFile database in the device repository.
+	 * @param dstFile path to be copied
 	 */
-	private void copy( String targetFile, String copyFile ){
+	private void copy( String srcFile, String dstFile ){
 		try {
-			InputStream lm_oInput = new FileInputStream(new File(targetFile));
+			InputStream lm_oInput = new FileInputStream(new File(srcFile));
 			byte[] buff = new byte[ 128 ];
-			FileOutputStream lm_oOutPut = new FileOutputStream( copyFile );
+			FileOutputStream lm_oOutPut = new FileOutputStream( dstFile );
 			while(true){
 				int bytesRead = lm_oInput.read( buff );
 				if( bytesRead == -1 ) break;

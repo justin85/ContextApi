@@ -1,22 +1,14 @@
 package activity.classifier.activity;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.text.ParseException;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
-
-import com.flurry.android.FlurryAgent;
 
 import activity.classifier.R;
 import activity.classifier.common.Constants;
 import activity.classifier.common.ExceptionHandler;
-import activity.classifier.repository.OptionQueries;
+import activity.classifier.db.OptionsTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.rpc.ActivityRecorderBinder;
-import activity.classifier.rpc.Classification;
 import activity.classifier.service.RecorderService;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -24,9 +16,7 @@ import android.app.TabActivity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -34,14 +24,10 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.View;
 import android.view.Window;
-import android.view.View.OnClickListener;
-import android.widget.ArrayAdapter;
-import android.widget.Button;
-import android.widget.ListView;
 import android.widget.TabHost;
-import android.widget.Toast;
+
+import com.flurry.android.FlurryAgent;
 
 public class MainTabActivity extends TabActivity {
 	public static boolean serviceIsRunning = false;
@@ -57,11 +43,8 @@ public class MainTabActivity extends TabActivity {
 	 */
 	private boolean EnableDeletion;
 
-	private OptionQueries optionQuery;
-
-	/**
-	 * Updates the user interface.
-	 */
+	private SqlLiteAdapter sqlLiteAdapter;
+	private OptionsTable optionsTable;
 
 	/**
 	 * Displays the progress dialog, waits some time, starts the service, waits some more,
@@ -83,8 +66,8 @@ public class MainTabActivity extends TabActivity {
 			Log.v(Constants.DEBUG_TAG, "MainTabActivity: Connected to service");
 			
 			try {
-				Log.v(Constants.DEBUG_TAG, "Was the service started? "+optionQuery.getServiceStartedState()+", Is Running? "+service.isRunning());
-				if (optionQuery.getServiceStartedState() && !service.isRunning()) {
+				Log.v(Constants.DEBUG_TAG, "Was the service started? "+optionsTable.isServiceStarted()+", Is Running? "+service.isRunning());
+				if (optionsTable.isServiceStarted() && !service.isRunning()) {
 					MainTabActivity.this.startService();
 				}
 			} catch (RemoteException e) {
@@ -190,8 +173,8 @@ public class MainTabActivity extends TabActivity {
 		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
 
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
-		optionQuery = new OptionQueries(this);
-		optionQuery.load();
+		sqlLiteAdapter = SqlLiteAdapter.getInstance(this);
+		optionsTable = sqlLiteAdapter.getOptionsTable();
 
 		final TabHost tabHost = getTabHost();
 
@@ -222,10 +205,6 @@ public class MainTabActivity extends TabActivity {
 			EnableDeletion = false;
 			FlurryAgent.onEvent("recording_start");
 			startServiceRunnable.startService();
-
-			optionQuery.load();
-			optionQuery.setServiceStartedState(true);
-			optionQuery.save();
 			
 		} catch (Exception ex) {
 			Log.e(Constants.DEBUG_TAG, "Unable to get service state", ex);
@@ -236,10 +215,9 @@ public class MainTabActivity extends TabActivity {
 	{
 		try {
 			if (service.isRunning()) {
-
-				optionQuery.load();
-				optionQuery.setServiceStartedState(false);
-				optionQuery.save();
+				
+				optionsTable.setServiceStarted(false);
+				optionsTable.save();
 				
 				EnableDeletion = true;
 				FlurryAgent.onEvent("recording_stop");
@@ -273,8 +251,8 @@ public class MainTabActivity extends TabActivity {
 				return;
 			}
 
-
-			dialog = ProgressDialog.show(	MainTabActivity.this,
+			dialog = ProgressDialog.show(
+					MainTabActivity.this,
 					"Starting service",
 					"Please wait...", true);			
 			nextStep = DISPLAY_START_DIALOG;
@@ -286,8 +264,10 @@ public class MainTabActivity extends TabActivity {
 			switch (nextStep) {
 			case DISPLAY_START_DIALOG:
 			{
-				Intent intent = new Intent(	MainTabActivity.this,
-						RecorderService.class	);
+				Intent intent = new Intent(
+						MainTabActivity.this,
+						RecorderService.class
+						);
 				MainTabActivity.this.startService(intent);
 
 				nextStep = CLOSE_START_DIALOG;					
@@ -300,7 +280,6 @@ public class MainTabActivity extends TabActivity {
 					//	hide the progress dialog box
 					dialog.dismiss();
 					dialog = null;
-
 
 					//	if the service is still not running by the end of the delay
 					//		display an error message

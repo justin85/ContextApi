@@ -31,6 +31,18 @@ public class Constants {
 	public static final boolean OUTPUT_DEBUG_INFO = true;
 	
 	/**
+	 * The delay between two consecutive sampling batches.
+	 */
+	//	TODO: CHANGE THIS BEFORE COMMIT
+//	public static final int DELAY_SAMPLE_BATCH = 30*1000; //	30 secs in ms
+	public static final int DELAY_SAMPLE_BATCH = 10*1000; //	debugging use
+	
+	/**
+	 * The delay between two consecutive samples in a sample batch.
+	 */
+	public static final int DELAY_BETWEEN_SAMPLES = 50; //	50ms
+	
+	/**
 	 * Duration for the {@link AccountThread} to wait for the user's account
 	 * to be set on the phone before checking again.
 	 */
@@ -39,14 +51,14 @@ public class Constants {
 	/**
 	 * The interval between successive user interface updates in the {@link ActivityRecorderActivity}
 	 */
-	public static final int DELAY_UI_UPDATE = 15*1000;
+	public static final int DELAY_UI_UPDATE = 1000;
 	
 	/**
 	 * The interval between successive user interface updates in the {@link ActivityChartActivity}
 	 * This value should be quite large because updating the chart takes a large amount of
 	 * processing.
 	 */
-	public static final int DELAY_UI_GRAPHIC_UPDATE = 15*1000;
+	public static final int DELAY_UI_GRAPHIC_UPDATE = DELAY_SAMPLE_BATCH;
 	
 	/**
 	 * The interval between successive data uploads in {@link UploadActivityHistoryThread}
@@ -59,18 +71,6 @@ public class Constants {
 	 */
 	public static final int DELAY_SERVICE_START = 1000;
 
-	/**
-	 * The delay between two consecutive sampling batches.
-	 */
-	//	TODO: CHANGE THIS BEFORE COMMIT
-	public static final int DELAY_SAMPLE_BATCH = 30*1000; //	30 secs in ms
-//	public static final int DELAY_SAMPLE_BATCH = 10*1000; //	debugging use
-	
-	/**
-	 * The delay between two consecutive samples in a sample batch.
-	 */
-	public static final int DELAY_BETWEEN_SAMPLES = 50; //	50ms
-	
 	/**
 	 * A tag that can be used to identify this application's log entries.
 	 */
@@ -195,5 +195,16 @@ public class Constants {
 	 * The format used to store date values into the database
 	 */
 	public final static SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z z");
+	
+	/**
+	 * The maximum duration that debugging data should be maintained in the database
+	 */
+	public final static long DURATION_KEEP_DB_DEBUG_DATA = 12*60*60*1000L;
+	
+	/**
+	 * The maximum duration that activity data should be maintained in the database
+	 */
+	public final static long DURATION_KEEP_DB_ACTIVITY_DATA = 7*24*60*60*1000L;
+	
 	
 }

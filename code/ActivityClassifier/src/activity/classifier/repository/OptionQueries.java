@@ -26,7 +26,6 @@ public class OptionQueries extends Queries {
 			optionQueries = new OptionQueries(context);
 		return optionQueries;
 	}
-	
 
 	private DbAdapter dbAdapter;
 	

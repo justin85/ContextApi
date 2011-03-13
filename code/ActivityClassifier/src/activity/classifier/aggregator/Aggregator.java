@@ -50,27 +50,15 @@ public class Aggregator {
 		
 	put("", new HashMap<String, Double>() {{
 		put("CLASSIFIED", 0.5d);
-		put("UNCLASSIFIED", 0.5d);
 	}});
 
 	put("CLASSIFIED", new HashMap<String, Double>() {{
-		put("null", 0.2d);
-		put("CHARGING", 0.2d);
-		put("UNCARRIED", 0.2d);
-		put("WALKING", 0.2d);
-		put("TRAVELLING", 0.2d);
-		put("STATIONARY", 0.2d);
-	}});
-
-	put("UNCLASSIFIED", new HashMap<String, Double>() {{
-		put("UNKNOWN", 1.0d);
+		put("UNKNOWN", 0.25d);
+		put("UNCARRIED", 0.25d);
+		put("TRAVELLING", 0.25d);
+		put("STATIONARY", 0.25d);
 	}});
 	
-	put("CLASSIFIED/CHARGING", new HashMap<String, Double>() {{
-		put("null", 0.5d);
-		put("TRAVELLING", 0.5d);
-	}});
-		
 	}
 	};
 	
@@ -123,8 +111,8 @@ public class Aggregator {
 		}});
 	}};
 	*/
-    
-    public void addClassification(final String classification) {
+	
+	public void addClassification(final String classification) {
     	
         String path = "";
 

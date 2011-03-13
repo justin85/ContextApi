@@ -6,13 +6,13 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 
-import com.flurry.android.FlurryAgent;
-
 import activity.classifier.R;
 import activity.classifier.common.Constants;
-import activity.classifier.repository.OptionQueries;
+import activity.classifier.db.OptionsTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.service.RecorderService;
+import activity.classifier.utils.Calibrator;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ComponentName;
@@ -21,7 +21,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.preference.CheckBoxPreference;
@@ -33,6 +32,8 @@ import android.util.Log;
 import android.widget.CheckBox;
 import android.widget.Toast;
 
+import com.flurry.android.FlurryAgent;
+
 public class MainSettingsActivity extends PreferenceActivity {
 
 	ActivityRecorderBinder service = null;
@@ -41,7 +42,8 @@ public class MainSettingsActivity extends PreferenceActivity {
 	private int isWakeLockSet;
 	private boolean wakelock;
 
-	private OptionQueries optionQuery;
+	private SqlLiteAdapter sqlLiteAdapter;
+	private OptionsTable optionsTable;
 	
 	private CheckBoxPreference aggregatePref;
 
@@ -55,7 +57,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 			service = ActivityRecorderBinder.Stub.asInterface(iBinder);
 			Log.i("isrunning","Connection "+service+"");
 			try {
-				if(service==null || !service.isRunning()){
+				if(service==null || !service.isRunning()) {
 				}
 				else{
 					Log.i("Wakelock", "setWakelock from Setting");
@@ -79,8 +81,8 @@ public class MainSettingsActivity extends PreferenceActivity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		optionQuery = new OptionQueries(this);
-		optionQuery.load();
+		this.sqlLiteAdapter = SqlLiteAdapter.getInstance(this);
+		this.optionsTable = this.sqlLiteAdapter.getOptionsTable();
 		
 		wakelock=false;
 		Intent intent = new Intent(this, RecorderService.class);
@@ -96,7 +98,6 @@ public class MainSettingsActivity extends PreferenceActivity {
 	 */
 	protected void onResume() {
 		super.onResume();
-		optionQuery.load();
 		Log.i("isrunning","Resume "+service+"");
 		if(service!=null)
 			try {
@@ -105,7 +106,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 				e.printStackTrace();
 			}
 			
-		aggregatePref.setChecked(optionQuery.getUseAggregator());
+		aggregatePref.setChecked(optionsTable.getUseAggregator());
 	}
 
 	/**
@@ -113,7 +114,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 	 */
 	protected void onPause() {
 		super.onPause();
-		optionQuery.save();
+		optionsTable.save();
 		Log.i("isrunning","Pause "+service+"");
 		if(service!=null)
 			try {
@@ -177,7 +178,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 
 
 
-		wakelock = optionQuery.isWakeLockSet();
+		wakelock = optionsTable.isWakeLockSet();
 		Log.i("wake",wakelock+"");
 		screenPref.setChecked(wakelock);  
 		Log.i("wake",screenPref.isChecked()+"");
@@ -191,7 +192,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 					wakelock=(Boolean) arg1;//true value
 					Toast.makeText(getBaseContext(), "Screen Locked On", Toast.LENGTH_SHORT).show();
 					//update Wake Lock state to 1 (true)
-					optionQuery.setWakeLockState(true);
+					optionsTable.setWakeLockSet(true);
 //					getApplicationContext().unbindService(connection);
 //					getApplicationContext().bindService(new Intent(getBaseContext(), RecorderService.class),
 //							connection, Context.BIND_AUTO_CREATE);
@@ -200,10 +201,10 @@ public class MainSettingsActivity extends PreferenceActivity {
 				else{
 					wakelock=(Boolean) arg1;
 					Toast.makeText(getBaseContext(), "Screen Locked Off", Toast.LENGTH_SHORT).show();
-					optionQuery.setWakeLockState(false);
+					optionsTable.setWakeLockSet(false);
 					
 				}
-				optionQuery.save();
+				optionsTable.save();
 				getApplicationContext().unbindService(connection);
 				getApplicationContext().bindService(new Intent(getBaseContext(), RecorderService.class),
 						connection, Context.BIND_AUTO_CREATE);
@@ -214,10 +215,7 @@ public class MainSettingsActivity extends PreferenceActivity {
 
 		});
 
-
-
 		inlinePrefCat.addPreference(screenPref);
-
 
 		// Dialog based preferences
 		PreferenceCategory dialogBasedPrefCat = new PreferenceCategory(this);
@@ -303,14 +301,14 @@ public class MainSettingsActivity extends PreferenceActivity {
 	
 				public boolean onPreferenceChange(Preference arg0, Object arg1) {
 					boolean checked = (Boolean) arg1; 
-					optionQuery.setUseAggregator(checked);
-					optionQuery.save();
+					optionsTable.setUseAggregator(checked);
+					optionsTable.save();
 					aggregatePref.setChecked(checked);
 					return false;
 				}
 	
 			});
-			aggregatePref.setChecked(optionQuery.getUseAggregator());
+			aggregatePref.setChecked(optionsTable.getUseAggregator());
 
 			root.addPreference(developerPrefCat);
 			developerPrefCat.addPreference(aggregatePref);
@@ -332,10 +330,11 @@ public class MainSettingsActivity extends PreferenceActivity {
 					/* User clicked OK so do some stuff */
 					try {
 						if (service==null || !service.isRunning()) {
+							sqlLiteAdapter.close();
 							File f1 = new File(Constants.PATH_ACTIVITY_RECORDS_DB);
 							f1.delete();
 							Toast.makeText(getBaseContext(), "Database deleted", Toast.LENGTH_LONG).show();
-
+							sqlLiteAdapter.open();
 						} else {
 							Toast.makeText(getBaseContext(), "Stop Service first!", Toast.LENGTH_LONG).show();
 						}
@@ -360,12 +359,8 @@ public class MainSettingsActivity extends PreferenceActivity {
 			.setMessage("Do you really want to reset the calibration values?")
 			.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
 				public void onClick(DialogInterface dialog, int whichButton) {
-					optionQuery.setCalibrationState(false);
-					optionQuery.setValueOfGravity(Constants.GRAVITY);
-					optionQuery.setStandardDeviationX(Constants.CALIBARATION_ALLOWED_BASE_DEVIATION);
-					optionQuery.setStandardDeviationY(Constants.CALIBARATION_ALLOWED_BASE_DEVIATION);
-					optionQuery.setStandardDeviationZ(Constants.CALIBARATION_ALLOWED_BASE_DEVIATION);
-					optionQuery.save();
+					Calibrator.resetCalibrationOptions(optionsTable);
+					optionsTable.save();
 					setScreenSummary();
 					caliPref.setSummary(getScreenSummary());
 				}
@@ -387,10 +382,12 @@ public class MainSettingsActivity extends PreferenceActivity {
 	PreferenceScreen caliPref;
 	
 	private void setScreenSummary(){
-		screenSummary = "Gravity Value               : "+optionQuery.getValueOfGravity()+"\n" +
-		"Standard Deviation X : "+optionQuery.getStandardDeviationX()+"\n" +
-		"Standard Deviation Y : "+optionQuery.getStandardDeviationY()+"\n" +
-		"Standard Deviation Z : "+optionQuery.getStandardDeviationZ()+"\n";
+		float[] sd = optionsTable.getSd();
+		screenSummary =
+		"Gravity Value               : "+optionsTable.getValueOfGravity()+"\n" +
+		"Standard Deviation X : "+sd[Constants.ACCEL_X_AXIS]+"\n" +
+		"Standard Deviation Y : "+sd[Constants.ACCEL_Y_AXIS]+"\n" +
+		"Standard Deviation Z : "+sd[Constants.ACCEL_Z_AXIS]+"\n";
 	}
 	
 	private String getScreenSummary(){

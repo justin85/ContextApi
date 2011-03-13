@@ -14,6 +14,8 @@ import org.apache.http.entity.FileEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import activity.classifier.common.Constants;
+import activity.classifier.db.OptionsTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.repository.OptionQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.service.RecorderService;
@@ -52,18 +54,19 @@ public class AccountThread extends Thread {
 
 	private Context context;
 	private ActivityRecorderBinder service;
+	private SqlLiteAdapter sqlLiteAdapter;
+	private OptionsTable optionsTable;
 	private PhoneInfo phoneInfo;
-	private OptionQueries optionQueries;
 	private String toastString;
 	private boolean shouldExit;
 
-    public AccountThread(Context context, ActivityRecorderBinder service, PhoneInfo phoneInfo, OptionQueries optionQueries) {
+    public AccountThread(Context context, ActivityRecorderBinder service, PhoneInfo phoneInfo) {
     	super(AccountThread.class.getName());
     	this.context = context;
     	this.service = service;
+    	this.sqlLiteAdapter = SqlLiteAdapter.getInstance(context);
+    	this.optionsTable = sqlLiteAdapter.getOptionsTable();
     	this.phoneInfo = phoneInfo;
-    	this.optionQueries = optionQueries;
-    	this.optionQueries.load();
     	this.shouldExit = false;
     }
     
@@ -116,8 +119,6 @@ public class AccountThread extends Thread {
 			final File file = context.getFileStreamPath(Constants.RECORDS_FILE_NAME);
 			final FileEntity entity = new FileEntity(file, "text/plain");
 
-			optionQueries.load();
-			
 			//post user's information
 			try {
 				post.setHeader("UID",accountName);
@@ -139,7 +140,7 @@ public class AccountThread extends Thread {
 				"   IMEI number  : "+IMEI;
 
 				//set the account state to 1 (true)
-				optionQueries.setAccountState(true);
+				optionsTable.setAccountSent(true);
 				Log.i("postUserDetail","posted");
 
 			} catch (IOException ex) {
@@ -148,10 +149,10 @@ public class AccountThread extends Thread {
 				toastString = "Submission failed,\n check phone's Internet connectivity and try again.";
 
 				//set the account state to 0 (false)
-				optionQueries.setAccountState(false);
+				optionsTable.setAccountSent(false);
 				Log.i("postUserDetail","Not posted");
 			} finally{
-				optionQueries.save();
+				optionsTable.save();
 			}
 		}
 	}

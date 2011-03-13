@@ -1,6 +1,7 @@
 package activity.classifier.utils;
 
 import activity.classifier.common.Constants;
+import activity.classifier.db.OptionsTable;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import android.os.RemoteException;
 import android.util.Log;
@@ -255,6 +256,7 @@ public class Calibrator {
 		boolean motionDetected = false;
 		for (int axis=0; axis<Constants.ACCEL_DIM; ++axis) {
 			if (measurement.axisSd[axis]>baseAllowedSdDev[axis]*magnitude) {
+				Log.v(Constants.DEBUG_TAG, "Motion detected in current measurement, sd["+axis+"]="+measurement.axisSd[axis]+" max="+(baseAllowedSdDev[axis]*magnitude));
 				motionDetected = true;
 				break;
 			}
@@ -341,7 +343,6 @@ public class Calibrator {
 		
 		//	check if there is any motion in the current found data
 		if (hasMotion(currGravity, resetSd, allowedMultiplesOfDeviation)) {
-			Log.v(Constants.DEBUG_TAG, "Motion detected in current measurement");
 //			for (int i=0; i<data.length; ++i) {
 //				String s = "";
 //				for (int d=0; d<data[i].length; ++d)
@@ -439,5 +440,28 @@ public class Calibrator {
 					);
 		}
 		
+	}
+	
+	/**
+	 * A centralised way of reseting calibration values in the options 
+	 * {@link OptionsTable}.
+	 * 
+	 * @param optionsTable
+	 */
+	public static void resetCalibrationOptions(OptionsTable optionsTable) {
+		optionsTable.setCalibrated(false);
+		optionsTable.setValueOfGravity(Constants.GRAVITY);
+		optionsTable.setSd(new float[] {
+				Constants.CALIBARATION_ALLOWED_BASE_DEVIATION,
+				Constants.CALIBARATION_ALLOWED_BASE_DEVIATION,
+				Constants.CALIBARATION_ALLOWED_BASE_DEVIATION
+		});
+		optionsTable.setMean(new float[] {
+				0,
+				0,
+				0
+		});
+		optionsTable.setAllowedMultiplesOfSd(Constants.CALIBARATION_ALLOWED_MULTIPLES_DEVIATION);
+		optionsTable.setCount(0);
 	}
 }

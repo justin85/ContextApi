@@ -11,11 +11,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.locks.ReentrantLock;
 
 import activity.classifier.R;
 import activity.classifier.common.Constants;
 import activity.classifier.common.ExceptionHandler;
+import activity.classifier.db.ActivitiesTable;
+import activity.classifier.db.OptionsTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.repository.ActivityQueries;
 import activity.classifier.repository.OptionQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
@@ -32,7 +39,10 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.ListView;
 
 import com.flurry.android.FlurryAgent;
@@ -43,22 +53,21 @@ import com.flurry.android.FlurryAgent;
  * 
  */
 public class ActivityListActivity extends Activity {
+	
+	private final static SimpleDateFormat DISPLAY_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	
+	private static int SINGLE_DAY = (24*60*60*1000);
 
 	public static boolean serviceIsRunning = false;
 
 	private final Handler handler = new Handler();
 
 	private ActivityRecorderBinder service = null;
-
-	private ProgressDialog dialog;
-
-	/**
-	 * enable to delete database in the device repository.
-	 */
-	private boolean EnableDeletion;
-
-	private OptionQueries optionQuery;
-	private ActivityQueries activityQuery;
+	
+	private SqlLiteAdapter sqlLiteAdapter;
+	private OptionsTable optionsTable;
+	private ActivitiesTable activitiesTable;
+	
 	/**
 	 * Updates the user interface.
 	 */
@@ -78,8 +87,6 @@ public class ActivityListActivity extends Activity {
 
 		public void onServiceDisconnected(ComponentName componentName) {
 			service = null;
-
-			Log.i(Constants.DEBUG_TAG, "Service Disconnected");
 		}
 
 
@@ -106,13 +113,14 @@ public class ActivityListActivity extends Activity {
 		//set exception handler
 		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
 
-		EnableDeletion = false;
-		optionQuery = new OptionQueries(this);
-		activityQuery = new ActivityQueries(this);
+		this.sqlLiteAdapter = SqlLiteAdapter.getInstance(this);
+		this.optionsTable = this.sqlLiteAdapter.getOptionsTable();
+		this.activitiesTable = this.sqlLiteAdapter.getActivitiesTable();
+		
 		setContentView(R.layout.main);
 
-		((ListView) findViewById(R.id.list)).setAdapter(new ArrayAdapter<Classification>(	this,
-				R.layout.item));
+		ListView listView = (ListView) findViewById(R.id.list); 
+		listView.setAdapter(new ArrayAdapter<Classification>(this,R.layout.item));
 		Intent intent = new Intent(this, RecorderService.class);
 		if(!getApplicationContext().bindService(intent, connection, Context.BIND_AUTO_CREATE)){
 			throw new IllegalStateException("Binding to service failed " + intent);
@@ -174,17 +182,23 @@ public class ActivityListActivity extends Activity {
 	 */
 	private class UpdateInterfaceRunnable implements Runnable {
 
-		//	save the state of the service, if it was previously running or not
-		//		to avoid unnecessary updates
-		private boolean prevServiceRunning = false;
-
 		//	avoids conflicts between scheduled updates,
 		//		and once-off updates 
 		private ReentrantLock reentrantLock = new ReentrantLock();
 
+		private long lastListUpdateAt = 0;
+		
+		//	reusable items
+		private Classification reusableClassification = new Classification();
+		private Map<Long,Integer> currentlyDisplayedItems = new TreeMap<Long,Integer>();
+		private List<Classification> filteredOut = new ArrayList<Classification>(200);
+		private int itemsInserted;
+		private int itemsUpdated;
+		private long maxUpdateTime;
+		
 		//	starts scheduled interface updates
 		public void start() {
-			handler.postDelayed(this, Constants.DELAY_UI_UPDATE);
+			handler.postDelayed(this, 100);
 		}
 
 		//	stops scheduled interface updates
@@ -197,142 +211,108 @@ public class ActivityListActivity extends Activity {
 		//		without interfering with the normal scheduled updates.
 		public void updateNow() {
 			if (reentrantLock.tryLock()) {
-
-				try {
-					if(service!=null && service.isRunning()){
-						updateUI();
-					}
-				} catch (ParseException ex) {
-					Log.e(Constants.DEBUG_TAG, "Error while performing scheduled UI update.", ex);
-				} catch (RemoteException ex) {
-					Log.e(Constants.DEBUG_TAG, "Error while performing scheduled UI update.", ex);
-				}
-
+				updateUI();
 				reentrantLock.unlock();
 			}
 		}
 
 		public void run() {
-			try {
-				if (reentrantLock.tryLock()) {
-					try {
-						if(service!=null && service.isRunning()){
-							updateUI();
-						}
-					} catch (ParseException e) {
-						e.printStackTrace();
-					}
-					reentrantLock.unlock();
-				}
-				
-				handler.postDelayed(this, Constants.DELAY_UI_GRAPHIC_UPDATE);
-			} catch (RemoteException e) {
-				e.printStackTrace();
+			if (reentrantLock.tryLock()) {
+				updateUI();
+				reentrantLock.unlock();
 			}
+			
+			handler.postDelayed(this, Constants.DELAY_UI_GRAPHIC_UPDATE);
 		}
-
-
-
+		
 		/**
+		 * updates the list,
 		 * 
-		 * changed from updateButton to updateUI
-		 * 
-		 * updates the user interface:
-		 * 	the toggle button's text is changed.
-		 * 	the classification list's entries are updated.
-		 * 
-		 * @throws ParseException
+		 * removing any items that shouldn't be displayed,
+		 * adding any new items recently inserted
+		 * and updating any items recently updated
 		 */
-		@SuppressWarnings("unchecked")
-		private void updateUI() throws ParseException {
-			try {
-				boolean isServiceRunning = service!=null && service.isRunning();
-
-				int count = activityQuery.getSizeOfTable();
-				
-				if(count>0){
-					//	update list either if service state has changed, or it's still running
-					if (isServiceRunning!=prevServiceRunning || isServiceRunning) {
-
-						final ArrayAdapter<Classification> adapter = (ArrayAdapter<Classification>) ((ListView) findViewById(R.id.list)).getAdapter();
-
-						ArrayList<String[]> items = new ArrayList<String[]>();
-						items = activityQuery.getTodayItemsFromActivityTable();
-						ArrayList<Classification> classification = new ArrayList<Classification>();
-						for(int i=0;i<items.size();i++){
-							classification.add(new Classification(
-									items.get(i)[1],
-									Constants.DB_DATE_FORMAT.parse(items.get(i)[2]).getTime(),
-									Constants.DB_DATE_FORMAT.parse(items.get(i)[3]).getTime()));
-						}
-
-						for (int i = 1; i <= classification.size(); i++) {
-							Classification c = classification.get(classification.size()-i);
-							if (c!=null)
-								c = c.withContext(ActivityListActivity.this);
-							if (c!=null)
-								adapter.add(c);
-						}
-
-
-						String lastActivity = activityQuery.getItemNameFromActivityTable(count);
-						String lastActivityStartDate = activityQuery.getItemStartDateFromActivityTable(count);
-						String lastActivityEndDate = activityQuery.getItemEndDateFromActivityTable(count);
-						Classification topClassification = null;
-						if (!adapter.isEmpty()) {
-							topClassification = adapter.getItem(0); 
-						}
-
-						if(lastActivity!=null && !topClassification.getClassification().equals(lastActivity)) {
-							Classification lastActivityClass = new Classification(
-									lastActivity,
-									Constants.DB_DATE_FORMAT.parse(lastActivityStartDate).getTime(),
-									Constants.DB_DATE_FORMAT.parse(lastActivityEndDate).getTime());
-							lastActivityClass = lastActivityClass.withContext(ActivityListActivity.this);
-							Log.v(Constants.DEBUG_TAG, "Inserting activity: "+lastActivityClass.getNiceClassification()+", prev="+topClassification);
-							adapter.insert(lastActivityClass,0);
-						}else{
-							adapter.getItem(0).updateEnd(Constants.DB_DATE_FORMAT.parse(lastActivityEndDate).getTime());
-							adapter.notifyDataSetChanged();
-						}
-						
+		private void updateUI() {
+			@SuppressWarnings("unchecked")
+			final ArrayAdapter<Classification> adapter = (ArrayAdapter<Classification>) ((ListView) findViewById(R.id.list)).getAdapter();
+			
+			long currentTime = System.currentTimeMillis();
+			
+			//	define the required period in which we want items to appear on the list
+			long periodStart = currentTime;
+			long periodEnd = currentTime - SINGLE_DAY;
+			
+			//	remove all items older than the required period
+			{
+				filteredOut.clear();
+				// also, obtain a list of items currently on the list, and their locations
+				currentlyDisplayedItems.clear();
+				int index = 0;
+				//	go through each item in the list
+				for (int len=adapter.getCount(), i=0; i<len; ++i) {
+					Classification cl = adapter.getItem(i);
+					long end = cl.getEnd();
+					if (end<periodEnd) {
+						filteredOut.add(cl);
+					} else {
+						currentlyDisplayedItems.put(cl.getStart(), index);
+						++index;
 					}
 				}
-				prevServiceRunning = isServiceRunning;
-
-			} catch (RemoteException ex) {
-				Log.e(Constants.DEBUG_TAG, "Error while updating user interface", ex);
+				//	remove the items
+				for (Classification cl:filteredOut)
+					adapter.remove(cl);
+				filteredOut.clear();
+			}
+			
+			this.itemsInserted = 0;
+			this.itemsUpdated = 0;
+			this.maxUpdateTime = Long.MIN_VALUE;			
+			
+			//	fetch newly updated items between the period
+			activitiesTable.loadUpdated(
+					periodStart, periodEnd,
+					lastListUpdateAt,
+					reusableClassification,
+					new ActivitiesTable.ClassificationDataCallback() {
+						@Override
+						public void onRetrieve(Classification cl) {
+							//	check if item is on the list (updated) or is new (inserted)
+							if (currentlyDisplayedItems.containsKey(cl.getStart())) {
+								int index = currentlyDisplayedItems.get(cl.getStart());
+								//shift the original index by the number of items inserted
+								Classification dst = adapter.getItem(itemsInserted+index);
+								//	update the one on the list
+								dst.setClassification(cl.getClassification());
+								dst.setEnd(cl.getEnd());
+								++itemsUpdated;
+							} else {
+								//	insert at the top
+								Classification classification = new Classification(cl.getClassification(), cl.getStart(), cl.getEnd());
+								classification.withContext(ActivityListActivity.this);
+								adapter.insert(classification, 0);
+								++itemsInserted;
+							}
+							
+							//	find the time the latest item was updated
+							long lastUpdate = cl.getLastUpdate(); 
+							if (lastUpdate>maxUpdateTime) {
+								maxUpdateTime = lastUpdate;
+							}
+						}
+					}
+				);
+			
+			//	if any item has been updated or inserted
+			if (itemsUpdated>0 || itemsInserted>0) {
+				//	notify that the list data set has changed
+				adapter.notifyDataSetChanged();
+				
+				//	set the time the list was last updated
+				//		to the time the latest item was updated
+				lastListUpdateAt = maxUpdateTime;
 			}
 		}
-
 	}
-
+	
 }
-
-/*
-Changes made by Umran:
-
-1) formatting.
-2) changed method name updateButton() to updateUI(0
-3) changed field name updateRunnable to updateInterfaceRunnable
-4) removed initialisation of update UI sequence
-	from
- 		connection.onServiceConnected(ComponentName,IBinder)
- 		startServiceRunnable.run()
- 	to
- 		onResume()
-5) removed stopping of update UI sequence
-	from
-		onCreate(Bundle)
-		clickListener.onClick(View)
-		onServiceDisconnected(ComponentName)
-	to
-		onPause()
-6) Added StartServiceRunnable to handle the service-starting sequence. i.e.
-		i) Display progress dialog for 500ms
-		ii) Start service
-		iii) Display progress dialog for another 500ms
-		iv) Close progress dialog
-7) Added UpdateInterfaceRunnable to handle user interface updates.
-
- */
