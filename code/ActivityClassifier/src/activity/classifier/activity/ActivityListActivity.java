@@ -5,16 +5,11 @@
 
 package activity.classifier.activity;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.locks.ReentrantLock;
 
 import activity.classifier.R;
@@ -23,13 +18,10 @@ import activity.classifier.common.ExceptionHandler;
 import activity.classifier.db.ActivitiesTable;
 import activity.classifier.db.OptionsTable;
 import activity.classifier.db.SqlLiteAdapter;
-import activity.classifier.repository.ActivityQueries;
-import activity.classifier.repository.OptionQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.rpc.Classification;
 import activity.classifier.service.RecorderService;
 import android.app.Activity;
-import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -37,12 +29,7 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.RemoteException;
-import android.util.Log;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
-import android.widget.BaseAdapter;
 import android.widget.ListView;
 
 import com.flurry.android.FlurryAgent;

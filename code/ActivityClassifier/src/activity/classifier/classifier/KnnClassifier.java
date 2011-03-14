@@ -118,7 +118,7 @@ public class KnnClassifier implements Classifier {
         Arrays.sort(distances, distanceComparator);
         activityCounts.clear();
         
-        String bestActivity = "UNCLASSIFIED/UNKNOWN";
+        String bestActivity = "UNKNOWN";
         int bestCount = 0;
         
         for (int l = model.size(), i=0; i<K_VALUE && i<l; ++i) {

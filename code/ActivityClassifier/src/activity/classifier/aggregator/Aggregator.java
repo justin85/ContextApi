@@ -24,8 +24,13 @@ package activity.classifier.aggregator;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import activity.classifier.common.Constants;
+import activity.classifier.common.StringComparator;
 import android.util.Log;
 
 /**
@@ -41,22 +46,22 @@ import android.util.Log;
  */
 public class Aggregator {
 
-    static final double DELTA = 0.25;
-    static final double THRESHOLD = 0.5;
+	private static final double DELTA = 0.25;
+	private static final double THRESHOLD = 0.5;
 
-    private final HashMap<String, HashMap<String, Double>> scores = 
-    	new HashMap<String, HashMap<String, Double>>() {
+    private static final Map<String, Map<String, Double>> DEFAULT_SCORES = 
+    	new HashMap<String, Map<String, Double>>() {
 	{
 		
 	put("", new HashMap<String, Double>() {{
 		put("CLASSIFIED", 0.5d);
+		put("UNKNOWN", 0.5d);
 	}});
 
 	put("CLASSIFIED", new HashMap<String, Double>() {{
-		put("UNKNOWN", 0.25d);
-		put("UNCARRIED", 0.25d);
-		put("TRAVELLING", 0.25d);
-		put("STATIONARY", 0.25d);
+		put("STATIONARY", 0.33d);
+		put("TRAVELLING", 0.33d);
+		put("WALKING", 0.33d);
 	}});
 	
 	}
@@ -111,6 +116,15 @@ public class Aggregator {
 		}});
 	}};
 	*/
+	
+	private Map<String, Map<String, Double>> scores;
+	
+    public Aggregator(Map<String, Map<String, Double>> scores) {
+    	if (scores==null)
+    		this.scores = DEFAULT_SCORES;
+    	else
+    		this.scores = scores;
+    }
 	
 	public void addClassification(final String classification) {
     	
@@ -172,8 +186,14 @@ public class Aggregator {
 
             path = path + (path.length() == 0 ? "" : "/") + bestPath;
         } while (scores.containsKey(path));
-
-        return path.replaceAll("(^CLASSIFIED)?/?null$", "");
+        
+        if (path.length()==0 || "null".equals(path) || "CLASSIFIED/null".equals(path)) {
+        	path = "UNKNOWN";
+        	addClassification(path);
+        }
+        
+        return path;
     }
+    
 
 }

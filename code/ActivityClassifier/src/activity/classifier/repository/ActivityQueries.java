@@ -6,6 +6,8 @@ import java.util.Calendar;
 import java.util.Date;
 
 import activity.classifier.common.Constants;
+import activity.classifier.db.ActivitiesTable;
+import activity.classifier.db.SqlLiteAdapter;
 import android.content.Context;
 import android.database.Cursor;
 import android.util.Log;
@@ -14,11 +16,10 @@ import android.util.Log;
  * A utility class which extends superclass {@link Queries} 
  * for handling queries to save or load activity.
  * 
- *	<p>
- *	Changes made by Umran: <br>
- *	Changed all methods dealing with database open/close methods
- *	to <code>synchronized</code> in order to ensure thread safety when called 
- *	from multiple threads.
+ * Updated by Umran:
+ * This class is now only used to fetch activities for drawing the charts in
+ * {@link activity.classifier.activity.ActivityChartActivity}. Updates and inserts
+ * are now being done though the class {@link activity.classifier.db.ActivitiesTable}.
  * 
  * @author Justin Lee
  *
@@ -73,80 +74,6 @@ public class ActivityQueries extends Queries{
 		super(context);
 		dbAdapter = super.dbAdapter;
 	}
-//	public synchronized void getLastItemFromActivityTable(int rowId){
-//		dbAdapter.open();
-//		
-//	}
-	
-	/**
-	 * Insert activity into the database.
-	 *  
-	 * @see DbAdapter
-	 * @param activity name of activity 
-	 * @param time date when the activity is happened
-	 * @param isChecked state whether posted or not (1 or 0)
-	 */
-	public synchronized void insertActivities(String activity, String time, int isChecked){
-		dbAdapter.open();
-		dbAdapter.insertToActivityTable(activity, time, isChecked);
-		dbAdapter.close();
-	}
-
-	/**
-	 * Get un-posted items from the database.
-	 * 
-	 * @see DbAdapter
-	 * @param isChecked state whether posted or not (1 or 0)
-	 */
-	public synchronized void getUncheckedItemsFromActivityTable(int isChecked){
-
-		ArrayList<String> uncheckedItems = new ArrayList<String>();
-
-		dbAdapter.open();
-		//get un-posted items and assign them to #uncheckedItems.
-		Cursor result = dbAdapter.fetchUnCheckedItemsFromActivityTable(isChecked);
-		int i=0;
-		while(result.moveToNext()) {
-
-			uncheckedItems.add(Integer.parseInt(result.getString(0))+","+result.getString(1)+","+result.getString(2)+","+result.getString(3));
-			//			Log.i("uncheckedItems",uncheckedItems.get(i));
-			i++;
-		}
-		result.close();
-		dbAdapter.close();
-
-		/*
-		 * since the results from the query have three columns of data (Activity name, Date, state)
-		 * it needs to separate to three part as well in order to get them separately.
-		 */
-		seperateItems(uncheckedItems);
-		setUncheckedItemsSize(uncheckedItems.size());
-	}
-
-	public synchronized void getItemsFromActivityTable(String itemName){
-
-		ArrayList<String> items = new ArrayList<String>();
-
-		dbAdapter.open();
-		//get un-posted items and assign them to #uncheckedItems.
-		Cursor result = dbAdapter.fetchItemsFromActivityTable(itemName);
-		int i=0;
-		while(result.moveToNext()) {
-
-			items.add(Integer.parseInt(result.getString(0))+","+result.getString(1)+","+result.getString(2)+","+result.getString(3));
-			//			Log.i("uncheckedItems",items.get(i));
-			i++;
-		}
-		result.close();
-		dbAdapter.close();
-
-		/*
-		 * since the results from the query have three columns of data (Activity name, Date, state)
-		 * it needs to separate to three part as well in order to get them separately.
-		 */
-		seperateItems(items);
-		setUncheckedItemsSize(items.size());
-	}
 	
 	public synchronized ArrayList<String[]> getTodayItemsFromActivityTable(){
 
@@ -172,10 +99,7 @@ public class ActivityQueries extends Queries{
 		setHourBefore(hourTime);
 
 
-		dbAdapter.open();
 		items = dbAdapter.fetchTodayItemsFromActivityTable(todayTime,date);
-		//		Log.i("DB",items.size()+"");
-		dbAdapter.close();
 		ArrayList<ArrayList<String[]>> activityGroup = new ArrayList<ArrayList<String[]>>();
 		activityGroup=getActivityGroup(items);
 
@@ -245,93 +169,16 @@ public class ActivityQueries extends Queries{
 
 		return activityGroup;
 	}
-
-	/**
-	 * 
-	 * @param rowId table row ID
-	 * @return activity name related to the row ID
-	 */
-	public synchronized String getItemNameFromActivityTable(long rowId){
-		dbAdapter.open();
-		String result = dbAdapter.fetchLastItemNames(rowId);
-		dbAdapter.close();
-		return result;
-	}
-
-	/**
-	 * 
-	 * @param rowId table row ID
-	 * @return end date related to the row ID
-	 */
-	public synchronized String getItemEndDateFromActivityTable(long rowId){
-		dbAdapter.open();
-		String result = dbAdapter.fetchLastItemEndDate(rowId);
-		dbAdapter.close();
-		return result;
-	}
-
-	/**
-	 * 
-	 * @param rowId table row ID
-	 * @return end date related to the row ID
-	 */
-	public synchronized String getItemStartDateFromActivityTable(long rowId){
-		dbAdapter.open();
-		String result = dbAdapter.fetchLastItemStartDate(rowId);
-		dbAdapter.close();
-		return result;
-	}
-
-	/**
-	 * 
-	 * @param ItemIDs row ID
-	 * @param ItemEndDates activity end time
-	 */
-	public synchronized void updateNewItems(long ItemIDs, String ItemEndDates){
-		dbAdapter.open();
-		dbAdapter.updateNewItemstoActivityTable(ItemIDs, ItemEndDates);
-		dbAdapter.close();
-	}
-
+	
 	/**
 	 * 
 	 * @return the size of the activity table (the number of the rows)
 	 */
 	public synchronized int getSizeOfTable(){
-		dbAdapter.open();
 		int count=dbAdapter.fetchSizeOfRow();
-		dbAdapter.close();
 		return count;
 	}
-
-	/**
-	 * Update un-posted items 
-	 * @param itemIDs row Id
-	 * @param itemNames activity name
-	 * @param itemDates activity date
-	 * @param isChecked sent item state
-	 */
-	public synchronized void updateUncheckedItems(long ItemIDs, String ItemNames, String ItemStartDates, String ItemEndDates, int isChecked){
-		dbAdapter.open();
-		dbAdapter.updateItemsToActivityTable(ItemIDs, ItemNames, ItemStartDates, ItemEndDates, isChecked);
-		dbAdapter.close();
-	}
 	
-	/**
-	 * Update un-posted items 
-	 * @param itemIDs row Id
-	 * @param itemNames activity name
-	 * @param itemDates activity date
-	 * @param isChecked sent item state
-	 */
-	public synchronized void updateUncheckedItems(ArrayList<String[]> items){
-		dbAdapter.open();
-		for(int i=0;i<items.size();i++){
-			dbAdapter.updateItemsToActivityTable(Long.parseLong(items.get(i)[0]), items.get(i)[1], items.get(i)[2], items.get(i)[3], Integer.parseInt(items.get(i)[4]));
-		}
-		dbAdapter.close();
-	}
-
 	private void setUncheckedItemsSize(int size){
 		this.size = size;
 	}

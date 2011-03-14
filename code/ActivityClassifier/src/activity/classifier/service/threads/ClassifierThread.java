@@ -17,13 +17,10 @@ import activity.classifier.db.ActivitiesTable;
 import activity.classifier.db.DebugDataTable;
 import activity.classifier.db.OptionsTable;
 import activity.classifier.db.SqlLiteAdapter;
-import activity.classifier.repository.OptionQueries;
-import activity.classifier.repository.TestAVQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.service.RecorderService;
 import activity.classifier.utils.CalcStatistics;
 import activity.classifier.utils.Calibrator;
-import activity.classifier.utils.FeatureExtractor;
 import activity.classifier.utils.RotateSamplesToVerticalHorizontal;
 import android.content.Context;
 import android.os.RemoteException;
@@ -98,7 +95,7 @@ public class ClassifierThread extends Thread {
 		this.debugDataTable = sqlLiteAdapter.getDebugDataTable();
 
 		this.classifier = new KnnClassifier(RecorderService.model.entrySet());
-		this.aggregator = new Aggregator();
+		this.aggregator = new Aggregator(null);
 		
 		calibrator = new Calibrator(
 				service, 
@@ -233,7 +230,7 @@ public class ClassifierThread extends Thread {
 			isCalibrated = true;
 		}
 		
-		String classification = "UNCLASSIFIED/UNKNOWN";
+		String classification = "UNKNOWN";
 		
 		//	check the current gravity, rotate and perform classification
 		{
@@ -251,6 +248,8 @@ public class ClassifierThread extends Thread {
 				if (rotateSamples.rotateToWorldCoordinates(dataMeans, data)) {
 					classification = classifier.classifyRotated(data);
 					
+					Log.v(Constants.DEBUG_TAG, "Classifier Algorithm Output: "+classification);
+					
 					if (Constants.OUTPUT_DEBUG_INFO) {
 						logRotatedValues(dataMeans, data, size);
 						debugDataTable.setClassifierAlgoOutput(classification);
@@ -259,9 +258,12 @@ public class ClassifierThread extends Thread {
 					if (optionsTable.getUseAggregator()) {
 						aggregator.addClassification(classification);
 						String aggrClassification = aggregator.getClassification();
-						if (aggrClassification!=null && !ActivitiesTable.isSystemActivity(aggrClassification)) {
+						if (aggrClassification!=null && aggrClassification.length()>0 &&
+								!ActivitiesTable.isSystemActivity(aggrClassification)) {
 							classification = aggrClassification;
 						}
+						
+						Log.v(Constants.DEBUG_TAG, "Aggregator Output: "+aggrClassification);
 
 						if (Constants.OUTPUT_DEBUG_INFO) {
 							debugDataTable.setAggregatorAlgoOutput(aggrClassification);
@@ -304,6 +306,9 @@ public class ClassifierThread extends Thread {
 			debugDataTable.trim();
 			debugDataTable.insert();
 		}
+		
+		
+		Log.v(Constants.DEBUG_TAG, "Final Classifier Output: "+classification);
 		
 		return classification;
 	}

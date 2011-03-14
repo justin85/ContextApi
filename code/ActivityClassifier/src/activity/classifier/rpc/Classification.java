@@ -26,7 +26,7 @@ public class Classification implements Parcelable, Comparable<Classification> {
 	private CharSequence niceClassification;
 	private String startTime;
 	private String endTime;
-	private String duration="";
+	private String durationStr="";
 	private String classification;
 	private long start;
 	private long end;
@@ -48,7 +48,7 @@ public class Classification implements Parcelable, Comparable<Classification> {
 		this.end = start;
 		this.isChecked = false;
 		
-		computeDuration();
+		computeDurationStr();
 	}
 	
 	public Classification(String classification, long start, long end) {
@@ -59,20 +59,29 @@ public class Classification implements Parcelable, Comparable<Classification> {
 		this.end = end;
 		this.isChecked = false;
 		
-		computeDuration();
+		computeDurationStr();
 	}
 	
-	private void computeDuration() {
+	private void computeDurationStr() {
 		//        final String duration;
 		int length = (int) ((end - start) / 1000);
 
 		if (length < 60) {
-			duration = "<1 min";
+			durationStr = "<1 min";
 		} else if (length < 60 * 60) {
-			duration = (length / 60) + " mins";
+			durationStr = (length / 60) + " mins";
 		} else {
-			duration = (length / (60 * 60)) + " hrs";
+			durationStr = (length / (60 * 60)) + " hrs";
 		}
+		
+		
+		Date date = new Date();
+
+		date.setTime(start);
+		startTime = Constants.DB_DATE_FORMAT.format(date);
+
+		date.setTime(end);
+		endTime = Constants.DB_DATE_FORMAT.format(date);
 	}
 	
 
@@ -84,8 +93,8 @@ public class Classification implements Parcelable, Comparable<Classification> {
 		return endTime;
 	}
 	
-	public String getDuration(){
-		return duration;
+	public String getDurationStr(){
+		return durationStr;
 	}
 	
 	public String getNiceClassification(){
@@ -112,12 +121,12 @@ public class Classification implements Parcelable, Comparable<Classification> {
 	 */
 	public void setStart(long start) {
 		this.start = start;
-		computeDuration();
+		computeDurationStr();
 	}
 	
 	public void setEnd(long end) {
 		this.end = end;
-		computeDuration();
+		computeDurationStr();
 	}
 
 	public long getEnd() {
@@ -162,7 +171,7 @@ public class Classification implements Parcelable, Comparable<Classification> {
 			return niceClassification+"";
 		}
 		else{
-			return niceClassification + "\n" + startTime + " for " + duration;
+			return niceClassification + "\n" + startTime + " for " + durationStr;
 		}
 	}
 
@@ -178,12 +187,6 @@ public class Classification implements Parcelable, Comparable<Classification> {
 		}
 		
 		this.niceClassification = getNiceName(context, classification);
-
-		Date date = new Date(start);
-		Date enddate = new Date(end);
-
-		startTime = Constants.DB_DATE_FORMAT.format(date);
-		endTime = Constants.DB_DATE_FORMAT.format(enddate);
 	}
 	
 	public static String getNiceName(Context context, String classification)

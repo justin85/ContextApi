@@ -73,16 +73,21 @@ public class OptionsTable implements DbTableAdapter {
 	//	reusable
 	private ContentValues contentValues;
 	
-	private boolean isServiceStarted;
+	//	various system states
+	private boolean isServiceStarted = true;
+	private boolean useAggregator = true;
+	private boolean isAccountSent = false;
+	private boolean isWakeLockSet = false;
+	
+	// calibration
 	private boolean isCalibrated;
-	private boolean isAccountSent;
-	private boolean isWakeLockSet;
 	private float valueOfGravity;
 	private float[] sd = new float[Constants.ACCEL_DIM];
 	private float[] mean = new float[Constants.ACCEL_DIM];
 	private int count;
-	private boolean useAggregator;
 	private float allowedMultiplesOfSd;
+	
+	//	updates
 	private long lastUpdatedAt;
 	
 	protected OptionsTable(Context context) {

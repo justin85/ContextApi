@@ -16,7 +16,6 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import activity.classifier.common.Constants;
 import activity.classifier.db.OptionsTable;
 import activity.classifier.db.SqlLiteAdapter;
-import activity.classifier.repository.OptionQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.service.RecorderService;
 import activity.classifier.utils.PhoneInfo;

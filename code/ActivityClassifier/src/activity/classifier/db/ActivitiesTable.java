@@ -61,9 +61,14 @@ public class ActivitiesTable implements DbTableAdapter {
 		" WHERE " + KEY_START_LONG + " BETWEEN ? AND ? " +
 		" AND " + KEY_ACTIVITY + "=?";
 	
+	private static final String GET_COUNT_SQL =
+		"SELECT COUNT(*)" +
+		" FROM " + TABLE_NAME ;
+	
 	private Context context;
 	private SQLiteDatabase database;
 	private SQLiteStatement calcStatStatement;
+	private SQLiteStatement getCountStatement;
 	
 	//	reusable
 	private ContentValues insertContentValues;
@@ -100,6 +105,7 @@ public class ActivitiesTable implements DbTableAdapter {
 			")";
 		//	run the sql
 		database.execSQL(sql);
+		Log.v(Constants.DEBUG_TAG, "Activities Table Created");
 	}
 
 	@Override
@@ -112,6 +118,7 @@ public class ActivitiesTable implements DbTableAdapter {
 	public boolean init(SQLiteDatabase database) {
 		this.database = database;
 		this.calcStatStatement = this.database.compileStatement(CALC_STAT_SQL);
+		this.getCountStatement = this.database.compileStatement(GET_COUNT_SQL);
 		return true;
 	}
 
@@ -166,17 +173,48 @@ public class ActivitiesTable implements DbTableAdapter {
 	}
 	
 	/**
-	 * Loads the classification that started at the given time
+	 * Loads the latest classification that occurred before the given time
+	 * 
+	 * Please note: This function shouldn't be called iteratively,
+	 * it might lead to a heavy load on the database, and hence on the phone.
 	 */
-	public boolean load(long startTime, Classification classification)
+	public boolean loadLatestBefore(long time, Classification classification)
 	{
-		Cursor cursor = database.rawQuery(SELECT_SQL + " WHERE "+KEY_START_LONG+"="+startTime, null);
+		Cursor cursor = database.rawQuery(
+				SELECT_SQL + " WHERE "+KEY_START_LONG+"=(" +
+						" SELECT MAX("+KEY_START_LONG+")" +
+						" FROM "+TABLE_NAME +
+						" WHERE "+KEY_START_LONG+"<"+time +
+						")", 
+				null);
 		try {
 			if (cursor.moveToNext()) {
 				assignValuesToClassification(cursor, classification);
 				return true;
 			} else {
 				return false;
+			}
+		} finally {
+			cursor.close();
+		}
+	}
+	
+	/**
+	 * Loads the classification that started at the given time
+	 */
+	public void loadAllBetween(long startStartTime, long endStartTime, Classification reusableClassification, ClassificationDataCallback callback)
+	{
+		Cursor cursor = database.rawQuery(
+				SELECT_SQL + 
+				" WHERE "+KEY_END_LONG+" BETWEEN "+Math.min(startStartTime, endStartTime)+" AND "+Math.max(startStartTime, endStartTime) +
+				" ORDER BY " + KEY_START_LONG + " ASC ",
+				null);
+		try {
+			while (cursor.moveToNext()) {
+				//	assign it
+				assignValuesToClassification(cursor, reusableClassification);
+				//	return it
+				callback.onRetrieve(reusableClassification);
 			}
 		} finally {
 			cursor.close();
@@ -264,7 +302,16 @@ public class ActivitiesTable implements DbTableAdapter {
 		int rows = database.update(TABLE_NAME, updateCheckedContentValues, KEY_START_LONG+"="+startTime, null);
 		if (rows==0)
 			Log.w(Constants.DEBUG_TAG, "Warning: Update Failed: table='"+TABLE_NAME+"', "+KEY_START_LONG+"="+startTime+", "+KEY_IS_CHECKED+"=1");
-
+	}
+	
+	/**
+	 * Returns the number of rows available in the database
+	 */
+	public long getCountRows()
+	{
+		synchronized (getCountStatement) {
+			return getCountStatement.simpleQueryForLong();
+		}
 	}
 	
 	/**

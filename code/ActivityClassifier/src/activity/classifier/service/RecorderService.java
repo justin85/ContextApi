@@ -49,8 +49,6 @@ import activity.classifier.db.OptionsTable;
 import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.model.ModelReader;
 import activity.classifier.repository.ActivityQueries;
-import activity.classifier.repository.OptionQueries;
-import activity.classifier.repository.TestAVQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.rpc.Classification;
 import activity.classifier.service.threads.AccountThread;

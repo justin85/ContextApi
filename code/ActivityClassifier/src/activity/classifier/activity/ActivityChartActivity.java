@@ -12,6 +12,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import activity.classifier.R;
 import activity.classifier.common.Constants;
+import activity.classifier.db.ActivitiesTable;
+import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.repository.ActivityQueries;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.rpc.Classification;
@@ -66,7 +68,8 @@ public class ActivityChartActivity extends Activity {
 	public ArrayList<Long> fourHoursDuration = new ArrayList<Long>(); 
 	public ArrayList<Long> hourDuration = new ArrayList<Long>(); 
 
-
+	private SqlLiteAdapter sqlLiteAdapter;
+	private ActivitiesTable activitiesTable;
 	private ActivityQueries activityQuery;
 	private ActivityRecorderBinder service = null;
 	private final Handler handler = new Handler();
@@ -188,7 +191,6 @@ public class ActivityChartActivity extends Activity {
 		activityGroup=activityQuery.getActivityGroup(items);
 		fourHourTime = activityQuery.getFourHourBefore();
 		hourTime = activityQuery.getHourBefore();
-
 
 		for(ACTIVITY=0;ACTIVITY<7;ACTIVITY++){
 			try {
@@ -354,39 +356,34 @@ public class ActivityChartActivity extends Activity {
 			
 			Log.v(Constants.DEBUG_TAG, "Update Chart UI");
 			
-			/*
-			int activitySize = activityQuery.getSizeOfTable();
-			Log.i("time",activitySize+"");
-
-			//	update list either if service state has changed, or it's still running
-			Log.i("time","start");
-			updateTimeDuration();
-			//					Log.i("duration"," "+todayDuration.get(0));						
-			//					update.setRunningState(true);
-			String newActivityStartDate = activityQuery.getItemStartDateFromActivityTable(activitySize);
-			String newActivityEndDate = activityQuery.getItemEndDateFromActivityTable(activitySize);
-			long newDuration = (Constants.DB_DATE_FORMAT.parse(newActivityEndDate).getTime()-Constants.DB_DATE_FORMAT.parse(newActivityStartDate).getTime())/1000;
-			String beforeActivityStartDate = activityQuery.getItemStartDateFromActivityTable(activitySize-1);
-			String beforeActivityEndDate = activityQuery.getItemEndDateFromActivityTable(activitySize-1);
-			long beforeDuration = (Constants.DB_DATE_FORMAT.parse(beforeActivityEndDate).getTime()-Constants.DB_DATE_FORMAT.parse(beforeActivityStartDate).getTime())/1000;
-
-			String newActivityName = activityQuery.getItemNameFromActivityTable(activitySize);
-			String beforeActivityName = activityQuery.getItemNameFromActivityTable(activitySize-1);
+			Classification latest = new Classification();
+			Classification beforeLatest = new Classification();
 			
-			String newDurationText = "";
-			String beforeDurationText = "";
-			
-			String newText = "";
-			String beforeText = "";
-			
-			if (!ActivityQueries.isSystemActivity(newActivityName)) {
-				newText = Classification.getNiceName(ActivityChartActivity.this, newActivityName);
-				newDurationText = getTimeText(newDuration);
+			if (!activitiesTable.loadLatest(latest)) {
+				latest = null;
+			}
+			if (latest==null || !activitiesTable.loadLatestBefore(latest.getStart(), beforeLatest)) {
+				beforeLatest = null;
 			}
 			
-			if (!ActivityQueries.isSystemActivity(beforeActivityName)) {
-				beforeText = Classification.getNiceName(ActivityChartActivity.this, beforeActivityName);
-				beforeDurationText = getTimeText(beforeDuration);
+			String newText = "";
+			String newDurationText = "";
+			String beforeText = "";
+			String beforeDurationText = "";
+			
+			if (latest!=null && !ActivityQueries.isSystemActivity(latest.getClassification())) {
+				newText = latest.getNiceClassification();
+				long period = latest.getEnd()-latest.getStart();
+				period /= 1000;
+				newDurationText = getTimeText(period);
+				Log.v(Constants.DEBUG_TAG, "Latest "+newText+", start="+latest.getStart()+", end="+latest.getEnd()+", duration="+(latest.getEnd()-latest.getStart())+"='"+newDurationText+"'");
+			}
+			
+			if (beforeLatest!=null && !ActivityQueries.isSystemActivity(beforeLatest.getClassification())) {
+				beforeText = beforeLatest.getNiceClassification();
+				long period = latest.getEnd()-latest.getStart();
+				period /= 1000;
+				beforeDurationText = getTimeText(period);
 			}
 
 			String newNiceText = String.format("%1$-10s", newText).toString();
@@ -396,7 +393,6 @@ public class ActivityChartActivity extends Activity {
 			textView2.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
 			textView3.setText(" Now    : " + newNiceText +" "+newDurationText);
 			textView4.setText(" Before : " + beforeNiceText +" "+beforeDurationText);
-			*/
 
 			flipper.startFlipping();
 			flipper.stopFlipping();
@@ -411,6 +407,8 @@ public class ActivityChartActivity extends Activity {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		flipper = new ViewFlipper(this);
+		sqlLiteAdapter = SqlLiteAdapter.getInstance(this);
+		activitiesTable = sqlLiteAdapter.getActivitiesTable();
 		activityQuery = new ActivityQueries(this);
 		chartview = new ChartView(this);
 		//		update = new updateTimeThread();
