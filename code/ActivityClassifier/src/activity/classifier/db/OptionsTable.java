@@ -39,6 +39,12 @@ public class OptionsTable implements DbTableAdapter {
 	public static final String KEY_MEAN_X = "meanX";
 	public static final String KEY_MEAN_Y = "meanY";
 	public static final String KEY_MEAN_Z = "meanZ";
+	public static final String KEY_OFFSET_X = "offsetX";
+	public static final String KEY_OFFSET_Y = "offsetY";
+	public static final String KEY_OFFSET_Z = "offsetZ";
+	public static final String KEY_SCALE_X = "scaleX";
+	public static final String KEY_SCALE_Y = "scaleY";
+	public static final String KEY_SCALE_Z = "scaleZ";
 	public static final String KEY_COUNT = "count";
 	public static final String KEY_ALLOWED_MULTIPLES_OF_SD = "allowedMultiplesOfSd";
 	public static final String KEY_IS_ACCOUNT_SENT = "isAccountSent";
@@ -59,6 +65,12 @@ public class OptionsTable implements DbTableAdapter {
 		KEY_MEAN_X + ", " +
 		KEY_MEAN_Y + ", " +
 		KEY_MEAN_Z + ", " +
+		KEY_OFFSET_X + ", " +
+		KEY_OFFSET_Y + ", " +
+		KEY_OFFSET_Z + ", " +
+		KEY_SCALE_X + ", " +
+		KEY_SCALE_Y + ", " +
+		KEY_SCALE_Z + ", " +
 		KEY_COUNT + ", " +
 		KEY_ALLOWED_MULTIPLES_OF_SD + ", " +
 		KEY_IS_ACCOUNT_SENT + ", " +
@@ -84,6 +96,8 @@ public class OptionsTable implements DbTableAdapter {
 	private float valueOfGravity;
 	private float[] sd = new float[Constants.ACCEL_DIM];
 	private float[] mean = new float[Constants.ACCEL_DIM];
+	private float[] offset = new float[Constants.ACCEL_DIM];
+	private float[] scale = new float[Constants.ACCEL_DIM];
 	private int count;
 	private float allowedMultiplesOfSd;
 	
@@ -93,6 +107,10 @@ public class OptionsTable implements DbTableAdapter {
 	protected OptionsTable(Context context) {
 		this.context = context;
 		this.contentValues = new ContentValues();
+		
+		for (int i=0; i<Constants.ACCEL_DIM; ++i) {
+			scale[i] = 1.0f;
+		}
 	}
 	
 	@Override
@@ -110,6 +128,12 @@ public class OptionsTable implements DbTableAdapter {
 			KEY_MEAN_X+" REAL NOT NULL, " +
 			KEY_MEAN_Y+" REAL NOT NULL, " +
 			KEY_MEAN_Z+" REAL NOT NULL, " +
+			KEY_OFFSET_X+" REAL NOT NULL, " +
+			KEY_OFFSET_Y+" REAL NOT NULL, " +
+			KEY_OFFSET_Z+" REAL NOT NULL, " +
+			KEY_SCALE_X+" REAL NOT NULL, " +
+			KEY_SCALE_Y+" REAL NOT NULL, " +
+			KEY_SCALE_Z+" REAL NOT NULL, " +
 			KEY_COUNT+" INTEGER NOT NULL, " +
 			KEY_ALLOWED_MULTIPLES_OF_SD+" REAL NOT NULL, " + 
 			KEY_IS_ACCOUNT_SENT+" INTEGER NOT NULL, " +
@@ -169,6 +193,12 @@ public class OptionsTable implements DbTableAdapter {
 		contentValues.put(KEY_MEAN_X, mean[Constants.ACCEL_X_AXIS]);
 		contentValues.put(KEY_MEAN_Y, mean[Constants.ACCEL_Y_AXIS]);
 		contentValues.put(KEY_MEAN_Z, mean[Constants.ACCEL_Z_AXIS]);
+		contentValues.put(KEY_OFFSET_X, offset[Constants.ACCEL_X_AXIS]);
+		contentValues.put(KEY_OFFSET_Y, offset[Constants.ACCEL_Y_AXIS]);
+		contentValues.put(KEY_OFFSET_Z, offset[Constants.ACCEL_Z_AXIS]);
+		contentValues.put(KEY_SCALE_X, scale[Constants.ACCEL_X_AXIS]);
+		contentValues.put(KEY_SCALE_Y, scale[Constants.ACCEL_Y_AXIS]);
+		contentValues.put(KEY_SCALE_Z, scale[Constants.ACCEL_Z_AXIS]);
 		contentValues.put(KEY_COUNT, count);
 		contentValues.put(KEY_ALLOWED_MULTIPLES_OF_SD, allowedMultiplesOfSd);
 		contentValues.put(KEY_IS_ACCOUNT_SENT, isAccountSent?1:0);
@@ -195,6 +225,12 @@ public class OptionsTable implements DbTableAdapter {
 				mean[Constants.ACCEL_X_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_MEAN_X));
 				mean[Constants.ACCEL_Y_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_MEAN_Y));
 				mean[Constants.ACCEL_Z_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_MEAN_Z));
+				offset[Constants.ACCEL_X_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_OFFSET_X));
+				offset[Constants.ACCEL_Y_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_OFFSET_Y));
+				offset[Constants.ACCEL_Z_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_OFFSET_Z));
+				scale[Constants.ACCEL_X_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_SCALE_X));
+				scale[Constants.ACCEL_Y_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_SCALE_Y));
+				scale[Constants.ACCEL_Z_AXIS] = cursor.getFloat(cursor.getColumnIndex(KEY_SCALE_Z));
 				count = cursor.getInt(cursor.getColumnIndex(KEY_COUNT));
 				allowedMultiplesOfSd = cursor.getFloat(cursor.getColumnIndex(KEY_ALLOWED_MULTIPLES_OF_SD));
 				isAccountSent = cursor.getInt(cursor.getColumnIndex(KEY_IS_ACCOUNT_SENT))!=0;
@@ -396,6 +432,36 @@ public class OptionsTable implements DbTableAdapter {
 	 */
 	public void setAllowedMultiplesOfSd(float allowedMultiplesOfSd) {
 		this.allowedMultiplesOfSd = allowedMultiplesOfSd;
+	}
+
+	/**
+	 * @return the offset
+	 */
+	public float[] getOffset() {
+		return offset;
+	}
+
+	/**
+	 * @param offset the offset to set
+	 */
+	public void setOffset(float[] offset) {
+		for (int i=0; i<Constants.ACCEL_DIM; ++i)
+			this.offset[i] = offset[i];
+	}
+
+	/**
+	 * @return the scale
+	 */
+	public float[] getScale() {
+		return scale;
+	}
+
+	/**
+	 * @param scale the scale to set
+	 */
+	public void setScale(float[] scale) {
+		for (int i=0; i<Constants.ACCEL_DIM; ++i)
+			this.scale[i] = scale[i];
 	}
 
 }

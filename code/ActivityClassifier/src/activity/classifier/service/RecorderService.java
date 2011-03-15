@@ -409,10 +409,7 @@ public class RecorderService extends Service implements Runnable {
 	@Override
 	public void onCreate() {
 		super.onCreate();
-
-		//set exception handler
 		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
-
 		Log.v(Constants.DEBUG_TAG, "RecorderService.onCreate()");
 	}
 	
@@ -452,6 +449,8 @@ public class RecorderService extends Service implements Runnable {
 	}
 
 	public void run() {		
+		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
+
 		//	create a looper for this thread
 		Looper.prepare();
 		

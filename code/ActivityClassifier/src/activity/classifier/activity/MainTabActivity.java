@@ -98,8 +98,9 @@ public class MainTabActivity extends TabActivity {
 	 * Enable to use menu button to make option menus.
 	 */
 	public boolean onCreateOptionsMenu(Menu menu) {
-
 		super.onCreateOptionsMenu(menu);
+		
+		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
 
 		MenuInflater inflater = getMenuInflater();
 		inflater.inflate(R.layout.menu, menu);

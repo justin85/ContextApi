@@ -14,6 +14,7 @@ import org.apache.http.entity.FileEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import activity.classifier.common.Constants;
+import activity.classifier.common.ExceptionHandler;
 import activity.classifier.db.OptionsTable;
 import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.rpc.ActivityRecorderBinder;
@@ -70,6 +71,8 @@ public class AccountThread extends Thread {
     }
     
 	public void run() {
+		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(context));
+		
 		boolean sent = false;
 		do {
 			String accountName = phoneInfo.getAccountName();

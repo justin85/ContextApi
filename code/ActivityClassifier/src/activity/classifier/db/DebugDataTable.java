@@ -46,15 +46,15 @@ public class DebugDataTable implements DbTableAdapter {
 	
 	private long sampleTime;
 	private Date startedAtDt = new Date();
-	private float meanX;
-	private float meanY;
-	private float meanZ;
-	private float sdX;
-	private float sdY;
-	private float sdZ;
-	private float rangeX;
-	private float rangeY;
-	private float rangeZ;
+	private Float meanX;
+	private Float meanY;
+	private Float meanZ;
+	private Float sdX;
+	private Float sdY;
+	private Float sdZ;
+	private Float rangeX;
+	private Float rangeY;
+	private Float rangeZ;
 	private Float horMean;
 	private Float verMean;
 	private Float horRange;
@@ -78,21 +78,21 @@ public class DebugDataTable implements DbTableAdapter {
 			"CREATE TABLE "+TABLE_NAME+" (" +
 			KEY_ID+" LONG PRIMARY KEY, " +
 			KEY_STARTED_AT+" TEXT NOT NULL, " +
-			KEY_MEAN_X + " REAL NOT NULL, " +
-			KEY_MEAN_Y + " REAL NOT NULL, " +
-			KEY_MEAN_Z + " REAL NOT NULL, " +
-			KEY_SD_X + " REAL NOT NULL, " +
-			KEY_SD_Y + " REAL NOT NULL, " +
-			KEY_SD_Z + " REAL NOT NULL, " +
-			KEY_RANGE_X + " REAL NOT NULL, " +
-			KEY_RANGE_Y + " REAL NOT NULL, " +
-			KEY_RANGE_Z + " REAL NOT NULL, " +
-			KEY_HOR_MEAN + " REAL NOT NULL, " +
-			KEY_VER_MEAN + " REAL NOT NULL, " +
-			KEY_HOR_RANGE + " REAL NOT NULL, " +
-			KEY_VER_RANGE + " REAL NOT NULL, " +
-			KEY_HOR_SD + " REAL NOT NULL, " +
-			KEY_VER_SD + " REAL NOT NULL, " +
+			KEY_MEAN_X + " REAL NULL, " +
+			KEY_MEAN_Y + " REAL NULL, " +
+			KEY_MEAN_Z + " REAL NULL, " +
+			KEY_SD_X + " REAL NULL, " +
+			KEY_SD_Y + " REAL NULL, " +
+			KEY_SD_Z + " REAL NULL, " +
+			KEY_RANGE_X + " REAL NULL, " +
+			KEY_RANGE_Y + " REAL NULL, " +
+			KEY_RANGE_Z + " REAL NULL, " +
+			KEY_HOR_MEAN + " REAL NULL, " +
+			KEY_VER_MEAN + " REAL NULL, " +
+			KEY_HOR_RANGE + " REAL NULL, " +
+			KEY_VER_RANGE + " REAL NULL, " +
+			KEY_HOR_SD + " REAL NULL, " +
+			KEY_VER_SD + " REAL NULL, " +
 			KEY_CLASSIFIER_ALGO_OUTPUT + " TEXT NULL, " +
 			KEY_AGGREGATOR_ALGO_OUTPUT + " TEXT NULL, " + 
 			KEY_FINAL_CLASSIFIER_OUTPUT + " TEXT NULL, " +
@@ -192,15 +192,15 @@ public class DebugDataTable implements DbTableAdapter {
 	 */
 	public void reset(long sampleTime) {
 		this.sampleTime = sampleTime;
-		this.meanX = Float.NaN;
-		this.meanY = Float.NaN;
-		this.meanZ = Float.NaN;
-		this.sdX = Float.NaN;
-		this.sdY = Float.NaN;
-		this.sdZ = Float.NaN;
-		this.rangeX = Float.NaN;
-		this.rangeY = Float.NaN;
-		this.rangeZ = Float.NaN;
+		this.meanX = null;
+		this.meanY = null;
+		this.meanZ = null;
+		this.sdX = null;
+		this.sdY = null;
+		this.sdZ = null;
+		this.rangeX = null;
+		this.rangeY = null;
+		this.rangeZ = null;
 		this.horMean = null;
 		this.verMean = null;
 		this.horRange = null;

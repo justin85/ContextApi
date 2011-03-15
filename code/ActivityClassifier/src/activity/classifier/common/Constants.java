@@ -122,7 +122,7 @@ public class Constants {
 	/**
 	 *	The value of gravity
 	 */
-	public static final float GRAVITY = 9.8f;
+	public static final float GRAVITY = 9.81f;
 	
 	/**
 	 *	The deviation from gravity that a sample is allowed,
@@ -134,7 +134,7 @@ public class Constants {
 	 *	e.g. in a car after a traffic light.
 	 */
 	public static final float MIN_GRAVITY_DEV = 0.5f; // 15% of gravity	
-	public static final float MAX_GRAVITY_DEV = 1.0f; // 100% of gravity	
+	public static final float MAX_GRAVITY_DEV = 0.5f; // 100% of gravity	
 	
 	/**
 	 * The number of axi on the accelerometer
@@ -183,7 +183,7 @@ public class Constants {
 	 * after calibration, the values used in the calibration are used instead.
 	 * 
 	 */
-	public final static float CALIBARATION_ALLOWED_MULTIPLES_DEVIATION = 2.0f;	// 2 times the standard deviation
+	public final static float CALIBARATION_ALLOWED_MULTIPLES_DEVIATION = 3.0f;	// 3 times the standard deviation
 	
 	/**
 	 * The duration which the means of different axis should be the same for the state

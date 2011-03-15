@@ -14,6 +14,7 @@ import activity.classifier.classifier.Classifier;
 import activity.classifier.classifier.KnnClassifier;
 import activity.classifier.common.ActivityNames;
 import activity.classifier.common.Constants;
+import activity.classifier.common.ExceptionHandler;
 import activity.classifier.db.ActivitiesTable;
 import activity.classifier.db.DebugDataTable;
 import activity.classifier.db.OptionsTable;
@@ -63,6 +64,7 @@ import android.util.Log;
  */
 public class ClassifierThread extends Thread {
 	
+	private Context context;
 	private ActivityRecorderBinder service;
 	private SampleBatchBuffer batchBuffer;
 	
@@ -88,6 +90,7 @@ public class ClassifierThread extends Thread {
 			SampleBatchBuffer sampleBatchBuffer) {
     	super(ClassifierThread.class.getName());
     	
+    	this.context = context;
 		this.service = service;
 		this.batchBuffer = sampleBatchBuffer;
 		
@@ -127,7 +130,7 @@ public class ClassifierThread extends Thread {
 	 * Classification start
 	 */
 	public void run() {
-
+		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(context));
 		Log.v(Constants.DEBUG_TAG, "Classification thread started.");
 		while (!this.shouldExit) {
 			try {
@@ -183,12 +186,18 @@ public class ClassifierThread extends Thread {
 		
 		//	take out accelerometer axis offsets
 		if (calibrator.isCalibrated()) {
-			float[] axisMeans = optionsTable.getMean();
-			float gravity = optionsTable.getValueOfGravity();
+			float[] offset = optionsTable.getOffset();
+			float[] scale = optionsTable.getScale();
+			
 			for (int i=0; i<size; ++i) {
-				data[i][Constants.ACCEL_X_AXIS] -= axisMeans[Constants.ACCEL_X_AXIS]; 
-				data[i][Constants.ACCEL_Y_AXIS] -= axisMeans[Constants.ACCEL_Y_AXIS];
-				data[i][Constants.ACCEL_Z_AXIS] -= (axisMeans[Constants.ACCEL_Z_AXIS] - gravity);
+				data[i][Constants.ACCEL_X_AXIS] -= offset[Constants.ACCEL_X_AXIS]; 
+				data[i][Constants.ACCEL_X_AXIS] /= scale[Constants.ACCEL_X_AXIS]; 
+				
+				data[i][Constants.ACCEL_Y_AXIS] -= offset[Constants.ACCEL_Y_AXIS];
+				data[i][Constants.ACCEL_Y_AXIS] /= scale[Constants.ACCEL_Y_AXIS];
+				
+				data[i][Constants.ACCEL_Z_AXIS] -= offset[Constants.ACCEL_Z_AXIS];
+				data[i][Constants.ACCEL_Z_AXIS] /= scale[Constants.ACCEL_Z_AXIS];
 			}
 		}
 		
@@ -226,9 +235,12 @@ public class ClassifierThread extends Thread {
 			optionsTable.setSd(sd);
 			optionsTable.setCount(calibrator.getCount());
 			optionsTable.setValueOfGravity(calibrator.getValueOfGravity());
-			optionsTable.save();
+			
+			mean[Constants.ACCEL_Z_AXIS] -= Constants.GRAVITY;
+			optionsTable.setOffset(mean);
 			
 			isCalibrated = true;
+			optionsTable.save();
 		}
 		
 		String classification = "UNKNOWN";
@@ -241,10 +253,6 @@ public class ClassifierThread extends Thread {
 			float maxGravity = gravity + gravity*Constants.MIN_GRAVITY_DEV;
 			
 			if (calcGravity>=minGravity && calcGravity<=maxGravity) {
-				if (!(calcGravity>=minGravity))
-					Log.v(Constants.DEBUG_TAG, "Gravity too low! Found gravity="+calcGravity+", expected ["+minGravity+","+maxGravity+"]");
-				if (!(calcGravity<=maxGravity))
-					Log.v(Constants.DEBUG_TAG, "Gravity too high! Found gravity="+calcGravity+", expected ["+minGravity+","+maxGravity+"]");
 				// first rotate samples to world-orientation
 				if (rotateSamples.rotateToWorldCoordinates(dataMeans, data)) {
 					classification = classifier.classifyRotated(data);

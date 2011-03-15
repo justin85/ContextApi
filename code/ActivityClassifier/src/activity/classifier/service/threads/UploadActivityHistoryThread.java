@@ -21,6 +21,7 @@ import org.apache.http.entity.FileEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import activity.classifier.common.Constants;
+import activity.classifier.common.ExceptionHandler;
 import activity.classifier.db.ActivitiesTable;
 import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.repository.ActivityQueries;
@@ -49,6 +50,8 @@ public class UploadActivityHistoryThread extends Thread {
 	private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	private static final DateFormat df1 = new SimpleDateFormat("Z z");
 
+	private Context context;
+	
 	protected AccountManager accountManager;
 
 	private SqlLiteAdapter sqlLiteAdapter;
@@ -71,6 +74,8 @@ public class UploadActivityHistoryThread extends Thread {
 	 */
 	public UploadActivityHistoryThread(Context context, PhoneInfo phoneInfo) {
     	super(UploadActivityHistoryThread.class.getName());
+    	
+    	this.context = context;
     	
     	this.sqlLiteAdapter = SqlLiteAdapter.getInstance(context);
 		this.activitiesTable = sqlLiteAdapter.getActivitiesTable();
@@ -117,7 +122,8 @@ public class UploadActivityHistoryThread extends Thread {
 
 	@Override
 	public void run() {
-
+		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(context));
+		
 		String accountName = null;
 		long currentTime;
 

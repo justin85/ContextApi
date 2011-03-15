@@ -449,18 +449,24 @@ public class Calibrator {
 	 * @param optionsTable
 	 */
 	public static void resetCalibrationOptions(OptionsTable optionsTable) {
+		float[] mean = new float[Constants.ACCEL_DIM];
+		float[] sd = new float[Constants.ACCEL_DIM];
+		float[] offset = new float[Constants.ACCEL_DIM];
+		float[] scale = new float[Constants.ACCEL_DIM];
+		
+		for (int i=0; i<Constants.ACCEL_DIM; ++i) {
+			mean[i] = 0.0f;
+			sd[i] = Constants.CALIBARATION_ALLOWED_BASE_DEVIATION;
+			offset[i] = 0.0f;
+			scale[i] = 1.0f;
+		}
+		
 		optionsTable.setCalibrated(false);
 		optionsTable.setValueOfGravity(Constants.GRAVITY);
-		optionsTable.setSd(new float[] {
-				Constants.CALIBARATION_ALLOWED_BASE_DEVIATION,
-				Constants.CALIBARATION_ALLOWED_BASE_DEVIATION,
-				Constants.CALIBARATION_ALLOWED_BASE_DEVIATION
-		});
-		optionsTable.setMean(new float[] {
-				0,
-				0,
-				0
-		});
+		optionsTable.setSd(sd);
+		optionsTable.setMean(mean);
+		optionsTable.setOffset(offset);
+		optionsTable.setScale(scale);
 		optionsTable.setAllowedMultiplesOfSd(Constants.CALIBARATION_ALLOWED_MULTIPLES_DEVIATION);
 		optionsTable.setCount(0);
 	}

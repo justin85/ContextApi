@@ -98,6 +98,7 @@ public class ExceptionHandler implements UncaughtExceptionHandler {
         String timestamp = String.valueOf(System.currentTimeMillis());
         final Writer result = new StringWriter();
         final PrintWriter printWriter = new PrintWriter(result);
+        printWriter.println("Exception Thrown By Thread:"+t.getId()+" '"+t.getName()+"'");
         e.printStackTrace(printWriter);
         String stacktrace = result.toString();
         printWriter.close();

@@ -12,6 +12,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import activity.classifier.R;
 import activity.classifier.common.Constants;
+import activity.classifier.common.ExceptionHandler;
 import activity.classifier.db.ActivitiesTable;
 import activity.classifier.db.SqlLiteAdapter;
 import activity.classifier.repository.ActivityQueries;
@@ -406,6 +407,8 @@ public class ActivityChartActivity extends Activity {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
+
 		flipper = new ViewFlipper(this);
 		sqlLiteAdapter = SqlLiteAdapter.getInstance(this);
 		activitiesTable = sqlLiteAdapter.getActivitiesTable();

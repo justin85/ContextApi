@@ -46,7 +46,7 @@ import android.util.Log;
  */
 public class KnnClassifier implements Classifier {
 	
-	private static final int K_VALUE = 5;
+	private static final int K_VALUE = 1;
 
     private final Set<Map.Entry<Float[], String>> model;
     
@@ -110,6 +110,7 @@ public class KnnClassifier implements Classifier {
 	            
 	            distances[i].classification = activity;
 	            distances[i].distance = distance;
+	            distances[i].entry = entry;
 	            ++i;
 	        }
     	}
@@ -117,6 +118,18 @@ public class KnnClassifier implements Classifier {
     	// sort distances
         Arrays.sort(distances, distanceComparator);
         activityCounts.clear();
+
+        Log.v(Constants.DEBUG_TAG, "KNN Comparator:");
+        Log.v(Constants.DEBUG_TAG, "\t"+Arrays.toString(features));
+        for (int i=0; i<10; ++i) {
+        	Log.v(Constants.DEBUG_TAG, 
+        			String.format("\t%d) %3.5f %15s %s",
+        					i+1,
+        					distances[i].distance, 
+        					distances[i].classification, 
+        					Arrays.toString(distances[i].entry.getKey())
+        					));
+        }
         
         String bestActivity = "UNKNOWN";
         int bestCount = 0;
@@ -140,10 +153,12 @@ public class KnnClassifier implements Classifier {
     private static class ClassificationDist {
     	String classification;
     	float distance;
+    	Map.Entry<Float[], String> entry;
     	
 		public ClassificationDist() {
 			this.classification = "";
 			this.distance = 0.0f;
+			this.entry = null;
 		}
 
     }
