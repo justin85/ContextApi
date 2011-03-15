@@ -12,6 +12,7 @@ import activity.classifier.accel.SampleBatchBuffer;
 import activity.classifier.aggregator.Aggregator;
 import activity.classifier.classifier.Classifier;
 import activity.classifier.classifier.KnnClassifier;
+import activity.classifier.common.ActivityNames;
 import activity.classifier.common.Constants;
 import activity.classifier.db.ActivitiesTable;
 import activity.classifier.db.DebugDataTable;
@@ -259,7 +260,7 @@ public class ClassifierThread extends Thread {
 						aggregator.addClassification(classification);
 						String aggrClassification = aggregator.getClassification();
 						if (aggrClassification!=null && aggrClassification.length()>0 &&
-								!ActivitiesTable.isSystemActivity(aggrClassification)) {
+								!ActivityNames.isSystemActivity(aggrClassification)) {
 							classification = aggrClassification;
 						}
 						
@@ -289,15 +290,12 @@ public class ClassifierThread extends Thread {
 		
 		if (chargingState) {
 			if (classification.contains("TRAVELLING"))
-				classification = "CLASSIFIED/CHARGING/TRAVELLING";
+				classification = ActivityNames.CHARGING_TRAVELLING;
 			else
-				classification = "CLASSIFIED/CHARGING";
+				classification = ActivityNames.CHARGING;
 		} else {
 			if (calibrator.isUncarried()) {
-//				if (classification.contains("TRAVELLING"))
-//					return "CLASSIFIED/UNCARRIED/TRAVELLING";
-//				else
-					classification = "CLASSIFIED/UNCARRIED";
+				classification = ActivityNames.UNCARRIED;
 			}
 		}
 		

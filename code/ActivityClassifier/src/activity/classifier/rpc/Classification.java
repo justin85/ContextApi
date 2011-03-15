@@ -8,6 +8,7 @@ package activity.classifier.rpc;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import activity.classifier.common.ActivityNames;
 import activity.classifier.common.Constants;
 import activity.classifier.db.ActivitiesTable;
 import activity.classifier.repository.ActivityQueries;
@@ -167,7 +168,7 @@ public class Classification implements Parcelable, Comparable<Classification> {
 
 	@Override 
 	public String toString() {
-		if (ActivitiesTable.isSystemActivity(classification)) {
+		if (ActivityNames.isSystemActivity(classification)) {
 			return niceClassification+"";
 		}
 		else{

@@ -41,6 +41,7 @@ import activity.classifier.accel.sync.SyncAccelReader;
 import activity.classifier.accel.sync.SyncAccelReaderFactory;
 import activity.classifier.accel.sync.SyncSampler;
 import activity.classifier.aggregator.Aggregator;
+import activity.classifier.common.ActivityNames;
 import activity.classifier.common.Constants;
 import activity.classifier.common.ExceptionHandler;
 import activity.classifier.db.ActivitiesTable;
@@ -512,16 +513,16 @@ public class RecorderService extends Service implements Runnable {
 			Classification lastClassification = new Classification();
 			//	load the latest classification available (false if the database is empty)
 			if (activitiesTable.loadLatest(lastClassification)) {
-		    	if(!ActivitiesTable.ACTIVITY_END.equals(lastClassification.getClassification())){
+		    	if(!ActivityNames.END.equals(lastClassification.getClassification())){
 		    		// the beginning of the new activity is the end of the last + 1,
 		    		//	we have to add one because if the end of the last activity is the same as its beginning (no duration passed)
 		    		//	then having another activity with the same start throws an exception in the INSERT statement
 		    		long start = lastClassification.getEnd() + 1;
-		    		Classification endClass = new Classification(ActivitiesTable.ACTIVITY_END, start);
+		    		Classification endClass = new Classification(ActivityNames.END, start);
 		    		activitiesTable.insert(endClass);
 		    	}
 			} else {
-	    		Classification endClass = new Classification(ActivitiesTable.ACTIVITY_END, System.currentTimeMillis());
+	    		Classification endClass = new Classification(ActivityNames.END, System.currentTimeMillis());
 	    		activitiesTable.insert(endClass);
 			}
 		}
@@ -577,7 +578,7 @@ public class RecorderService extends Service implements Runnable {
 		
 		// save message "END" to recognise when the background service is
 		// finished.
-		Classification endClass = new Classification(ActivitiesTable.ACTIVITY_END, System.currentTimeMillis());
+		Classification endClass = new Classification(ActivityNames.END, System.currentTimeMillis());
 		activitiesTable.insert(endClass);
 		MainTabActivity.serviceIsRunning = false;
 		

@@ -21,12 +21,6 @@ import android.util.Log;
  */
 public class ActivitiesTable implements DbTableAdapter {
 	
-	public static final String ACTIVITY_END = "END";
-	
-	public static boolean isSystemActivity(String activity) {
-		return ACTIVITY_END.equals(activity);
-	}
-	
 	public static final String TABLE_NAME = "activities";
 	
 	public static interface ClassificationDataCallback {
@@ -206,7 +200,7 @@ public class ActivitiesTable implements DbTableAdapter {
 	{
 		Cursor cursor = database.rawQuery(
 				SELECT_SQL + 
-				" WHERE "+KEY_END_LONG+" BETWEEN "+Math.min(startStartTime, endStartTime)+" AND "+Math.max(startStartTime, endStartTime) +
+				" WHERE "+KEY_START_LONG+" BETWEEN "+Math.min(startStartTime, endStartTime)+" AND "+Math.max(startStartTime, endStartTime) +
 				" ORDER BY " + KEY_START_LONG + " ASC ",
 				null);
 		try {
