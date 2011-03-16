@@ -117,8 +117,6 @@ public class RecorderService extends Service implements Runnable {
 
 	private boolean running;
 
-	public static Map<Float[], String> model;
-	
 	private Boolean SCREEN_DIM_WAKE_LOCK_MANAGER_IsAcquired = false;
 	private Boolean PARTIAL_WAKE_LOCK_MANAGER_IsAcquired = false;
 
@@ -492,7 +490,6 @@ public class RecorderService extends Service implements Runnable {
 		debugDataTable = sqlLiteAdapter.getDebugDataTable();
 		activitiesTable = sqlLiteAdapter.getActivitiesTable();
 		
-		model = ModelReader.getModel(this, R.raw.basic_model);
 		phoneInfo = new PhoneInfo(this);
 		batchBuffer = new SampleBatchBuffer();
 		

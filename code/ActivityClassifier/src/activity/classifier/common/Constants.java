@@ -164,16 +164,26 @@ public class Constants {
 //	public final static long DURATION_OF_CALIBRATION = 10*60*1000; // 60 seconds
 
 	/**
-	 * The deviation in the means of the accelerometer axis
+	 * The deviation in the means & sdof the accelerometer axis
 	 * 	within the calibration waiting duration given as {@link #DURATION_WAIT_FOR_CALIBRATION}
 	 * 
 	 * This value is only used initially, after calibration, the values used in
 	 * the calibration are used instead.
 	 * 
 	 * See {@link #CALIBARATION_ALLOWED_MULTIPLES_DEVIATION} for more info.
+	 * See {@link #CALIBARATION_MIN_ALLOWED_BASE_DEVIATION} for more info.
 	 */
 	public final static float CALIBARATION_ALLOWED_BASE_DEVIATION = 0.05f;
 
+	/**
+	 * The minimum deviation in the means & sd of the accelerometer axis
+	 * 	within the calibration waiting duration given as {@link #DURATION_WAIT_FOR_CALIBRATION}
+	 * 
+	 * See {@link #CALIBARATION_ALLOWED_MULTIPLES_DEVIATION} for more info.
+	 * See {@link #CALIBARATION_ALLOWED_BASE_DEVIATION} for more info.
+	 */
+	public final static float CALIBARATION_MIN_ALLOWED_BASE_DEVIATION = 0.1f;
+	
 	/**
 	 * This value is multiplied by the {@value #CALIBARATION_ALLOWED_BASE_DEVIATION} value
 	 * to get the range which the phone's accelerometer axis standard deviation is allowed to be in 
@@ -183,7 +193,7 @@ public class Constants {
 	 * after calibration, the values used in the calibration are used instead.
 	 * 
 	 */
-	public final static float CALIBARATION_ALLOWED_MULTIPLES_DEVIATION = 3.0f;	// 3 times the standard deviation
+	public final static float CALIBARATION_ALLOWED_MULTIPLES_DEVIATION = 2.0f;	// 2 times the standard deviation
 	
 	/**
 	 * The duration which the means of different axis should be the same for the state

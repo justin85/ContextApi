@@ -24,6 +24,8 @@ import android.util.Log;
  */
 public class Classification implements Parcelable, Comparable<Classification> {
 	
+	public final static SimpleDateFormat UI_DATE_FORMAT = new SimpleDateFormat("HH:mm:ss");
+	
 	private CharSequence niceClassification;
 	private String startTime;
 	private String endTime;
@@ -79,10 +81,10 @@ public class Classification implements Parcelable, Comparable<Classification> {
 		Date date = new Date();
 
 		date.setTime(start);
-		startTime = Constants.DB_DATE_FORMAT.format(date);
+		startTime = UI_DATE_FORMAT.format(date);
 
 		date.setTime(end);
-		endTime = Constants.DB_DATE_FORMAT.format(date);
+		endTime = UI_DATE_FORMAT.format(date);
 	}
 	
 

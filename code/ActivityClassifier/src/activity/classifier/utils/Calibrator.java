@@ -185,6 +185,8 @@ public class Calibrator {
 	 *            Acceleration standard deviation values
 	 */
 	private void doCalibration(float[] sampleMean, float[] sampleSd) {
+		this.valueOfGravity = 0.0f;
+		
 		for (int i = 0; i < Constants.ACCEL_DIM; i++) {
 			float newMean, newSd;
 			
@@ -198,10 +200,11 @@ public class Calibrator {
 			
 			this.mean[i] = newMean;
 			this.sd[i] = newSd;
+			
+			this.valueOfGravity += this.mean[i]*this.mean[i];
 		}
 		
-		this.valueOfGravity = (float)
-			Math.sqrt(this.mean[0] * this.mean[0] + this.mean[1] * this.mean[1] + this.mean[2] * this.mean[2]);
+		this.valueOfGravity = (float)Math.sqrt(this.valueOfGravity);
 		
 		++this.count;
 	}
@@ -231,7 +234,8 @@ public class Calibrator {
 			if (meanDif<0.0)
 				meanDif = -meanDif;
 			
-			if (meanDif>baseAllowedMeanDiff[axis]*magnitude) {
+			if (meanDif>baseAllowedMeanDiff[axis]*magnitude &&
+					meanDif>Constants.CALIBARATION_MIN_ALLOWED_BASE_DEVIATION*magnitude) {
 				movementDetected = true;
 				break;
 			}
@@ -255,7 +259,9 @@ public class Calibrator {
 	private boolean hasMotion(Measurement measurement, float[] baseAllowedSdDev, float magnitude) {
 		boolean motionDetected = false;
 		for (int axis=0; axis<Constants.ACCEL_DIM; ++axis) {
-			if (measurement.axisSd[axis]>baseAllowedSdDev[axis]*magnitude) {
+			if (measurement.axisSd[axis]>baseAllowedSdDev[axis]*magnitude &&
+					measurement.axisSd[axis]>Constants.CALIBARATION_MIN_ALLOWED_BASE_DEVIATION*magnitude
+					) {
 				Log.v(Constants.DEBUG_TAG, "Motion detected in current measurement, sd["+axis+"]="+measurement.axisSd[axis]+" max="+(baseAllowedSdDev[axis]*magnitude));
 				motionDetected = true;
 				break;

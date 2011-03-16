@@ -4,7 +4,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import activity.classifier.R;
+import activity.classifier.model.ModelReader;
 import activity.classifier.service.RecorderService;
+import android.content.Context;
 import android.util.Log;
 
 public class ActivityNames {
@@ -16,8 +19,6 @@ public class ActivityNames {
 	public static final String CHARGING					= "CLASSIFIED/CHARGING";
 	public static final String CHARGING_TRAVELLING		= "CLASSIFIED/CHARGING/TRAVELLING";
 	
-	public static final Set<String> ALL_ACTIVITIES = new TreeSet<String>(new StringComparator(false));
-	
 	/**
 	 * Check if the given activity is a system-based activity,
 	 * activities such as END, are not there for the user but for the system.
@@ -26,16 +27,23 @@ public class ActivityNames {
 		return END.equals(activity) || OFF.equals(activity);
 	}
 	
-	static {
-        for (Map.Entry<Float[], String> entry : RecorderService.model.entrySet()) {
+	public static Set<String> getAllActivities(Context context) {
+		
+		Map<Float[],String> model = ModelReader.getModel(context, R.raw.basic_model);
+		
+		Set<String> allActivities = new TreeSet<String>(new StringComparator(false));
+		
+        for (Map.Entry<Float[], String> entry : model.entrySet()) {
         	String activity = entry.getValue();
-        	ALL_ACTIVITIES.add(activity);
+        	allActivities.add(activity);
         }
         
-        ALL_ACTIVITIES.add(OFF);
-        ALL_ACTIVITIES.add(UNKNOWN);
-        ALL_ACTIVITIES.add(UNCARRIED);
-        ALL_ACTIVITIES.add(CHARGING);
+        allActivities.add(OFF);
+        allActivities.add(UNKNOWN);
+        allActivities.add(UNCARRIED);
+        allActivities.add(CHARGING);
+        
+        return allActivities;
 	}
 
 }

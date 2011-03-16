@@ -6,7 +6,10 @@
 package activity.classifier.service.threads;
 
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
 
+import activity.classifier.R;
 import activity.classifier.accel.SampleBatch;
 import activity.classifier.accel.SampleBatchBuffer;
 import activity.classifier.aggregator.Aggregator;
@@ -19,6 +22,7 @@ import activity.classifier.db.ActivitiesTable;
 import activity.classifier.db.DebugDataTable;
 import activity.classifier.db.OptionsTable;
 import activity.classifier.db.SqlLiteAdapter;
+import activity.classifier.model.ModelReader;
 import activity.classifier.rpc.ActivityRecorderBinder;
 import activity.classifier.service.RecorderService;
 import activity.classifier.utils.CalcStatistics;
@@ -68,6 +72,8 @@ public class ClassifierThread extends Thread {
 	private ActivityRecorderBinder service;
 	private SampleBatchBuffer batchBuffer;
 	
+	private Map<Float[],String> model; 
+	
 	private SqlLiteAdapter sqlLiteAdapter;
 	private OptionsTable optionsTable;
 	private DebugDataTable debugDataTable;
@@ -94,11 +100,13 @@ public class ClassifierThread extends Thread {
 		this.service = service;
 		this.batchBuffer = sampleBatchBuffer;
 		
+		this.model = ModelReader.getModel(context, R.raw.basic_model);
+		
 		this.sqlLiteAdapter = SqlLiteAdapter.getInstance(context);
 		this.optionsTable = sqlLiteAdapter.getOptionsTable();
 		this.debugDataTable = sqlLiteAdapter.getDebugDataTable();
 
-		this.classifier = new KnnClassifier(RecorderService.model.entrySet());
+		this.classifier = new KnnClassifier(this.model.entrySet());
 		this.aggregator = new Aggregator(null);
 		
 		calibrator = new Calibrator(

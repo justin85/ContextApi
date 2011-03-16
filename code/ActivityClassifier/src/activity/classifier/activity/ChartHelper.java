@@ -2,6 +2,7 @@ package activity.classifier.activity;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import activity.classifier.common.ActivityNames;
@@ -31,7 +32,11 @@ public class ChartHelper {
 	
 	public static class ChartData {
 		
-		public final float[][] percentageMatrix = new float[COL_DURATIONS.length][ActivityNames.ALL_ACTIVITIES.size()]; 
+		public final float[][] percentageMatrix;
+		
+		public ChartData(int numOfActivities) {
+			this.percentageMatrix = new float[COL_DURATIONS.length][numOfActivities];
+		}
 		
 	}
 	
@@ -48,24 +53,31 @@ public class ChartHelper {
 	private Context context;
 	private SqlLiteAdapter sqlLiteAdapter;
 	private ActivitiesTable activitiesTable;
+	private Set<String> allActivities;
 	
 	//	reusable instances
 	private Classification classification = new Classification();
-	public long[][] sumMatrix = new long[COL_DURATIONS.length][ActivityNames.ALL_ACTIVITIES.size()];
+	public long[][] sumMatrix;
 	
 	public ChartHelper(Context context) {
 		this.context = context;
 		this.sqlLiteAdapter = SqlLiteAdapter.getInstance(context);
 		this.activitiesTable = this.sqlLiteAdapter.getActivitiesTable();
+		this.allActivities = ActivityNames.getAllActivities(context);
+		
+		this.sumMatrix = new long[COL_DURATIONS.length][allActivities.size()];
 		
 		this.activityIndexes = new TreeMap<String,Integer>(new StringComparator(false));
 		{
 			int index = 0;
-			for (String activity:ActivityNames.ALL_ACTIVITIES) {
+			for (String activity:allActivities) {
 				this.activityIndexes.put(activity, index);
 				++index;
 			}
 		}
+		
+		for (int i=0; i<NUM_OF_DATA_SETS; ++i)
+			dataSets[i] = new ChartData(this.allActivities.size());
 	}
 	
 	public ChartData computeData()
@@ -77,7 +89,7 @@ public class ChartHelper {
 		final long periodEnd = periodStart + maxDuration;
 		
 		for (int i=0; i<COL_DURATIONS.length; ++i) {
-			for (int j=0; j<ActivityNames.ALL_ACTIVITIES.size(); ++j) {
+			for (int j=0; j<allActivities.size(); ++j) {
 				sumMatrix[i][j] = 0;
 			}
 		}
@@ -112,7 +124,7 @@ public class ChartHelper {
 		
 		for (int i=0; i<COL_DURATIONS.length; ++i) {
 			long totalNonSystem = 0;
-			for (String activity:ActivityNames.ALL_ACTIVITIES) {
+			for (String activity:allActivities) {
 				if (!ActivityNames.OFF.equals(activity)) {
 					int index = activityIndexes.get(activity);
 					totalNonSystem += sumMatrix[i][index];
@@ -128,7 +140,7 @@ public class ChartHelper {
 		ChartData data = dataSets[currentComputeData];
 		
 		for (int i=0; i<COL_DURATIONS.length; ++i) {
-			for (int j=0; j<ActivityNames.ALL_ACTIVITIES.size(); ++j) {
+			for (int j=0; j<allActivities.size(); ++j) {
 				data.percentageMatrix[i][j] = 100.0f * (float)sumMatrix[i][j] / (float)COL_DURATIONS[i];
 			}
 		}
