@@ -1,26 +1,9 @@
 /*
- * Copyright (c) 2009-2010 Chris Smith
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
  */
 
-package uk.co.md87.android.sensorlogger;
+package aus.csiro.justin.sensorlogger;
 
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -33,13 +16,14 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.telephony.TelephonyManager;
+import aus.csiro.justin.sensorlogger.activities.ResultsActivity;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TimerTask;
 
-import uk.co.md87.android.sensorlogger.activities.ResultsActivity;
-import uk.co.md87.android.sensorlogger.rpc.SensorLoggerBinder;
+import aus.csiro.justin.sensorlogger.R;
+import aus.csiro.justin.sensorlogger.rpc.SensorLoggerBinder;
 
 /**
  *
@@ -47,16 +31,21 @@ import uk.co.md87.android.sensorlogger.rpc.SensorLoggerBinder;
  */
 public class SensorLoggerService extends Service {
 
+	private int index=0;
     private final SensorLoggerBinder.Stub binder = new SensorLoggerBinder.Stub() {
 
         public void setState(int newState) throws RemoteException {
             doSetState(newState);
         }
-
+        public void setIndex(int index) throws RemoteException{
+        	doSetIndex(index);
+        }
         public int getCountdownTime() throws RemoteException {
             return countdown;
         }
-
+        public int getIndex() throws RemoteException{
+        	return index;
+        }
         public int getState() throws RemoteException {
             return state;
         }
@@ -70,8 +59,8 @@ public class SensorLoggerService extends Service {
             classifications.put(classification, classifications.get(classification) + 1);
 
             if (classCount == 15) {
-                showNotification();
-                setState(5);
+//                showNotification();
+//                setState(5);
             }
         }
 
@@ -166,7 +155,10 @@ public class SensorLoggerService extends Service {
     public IBinder onBind(final Intent arg0) {
         return binder;
     }
-
+    void doSetIndex(final int index) {
+    	this.index=index;
+    
+    }
     void doSetState(final int newState) {
         switch (newState) {
             case 2:

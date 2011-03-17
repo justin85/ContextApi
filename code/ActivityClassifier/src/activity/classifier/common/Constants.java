@@ -7,6 +7,7 @@ import activity.classifier.activity.ActivityChartActivity;
 import activity.classifier.service.RecorderService;
 import activity.classifier.service.threads.AccountThread;
 import activity.classifier.service.threads.UploadActivityHistoryThread;
+import android.graphics.Color;
 import android.os.Environment;
 
 /**
@@ -215,6 +216,36 @@ public class Constants {
 	 * The maximum duration that activity data should be maintained in the database
 	 */
 	public final static long DURATION_KEEP_DB_ACTIVITY_DATA = 7*24*60*60*1000L;
+	
+	/**
+	 * The size of footer texts
+	 */
+	public final static int FOOTER_SIZE = 3;
+	
+	/**
+	 * The names of footers
+	 */
+	public final static String[] FOOTER_NAMES = { "Last Hour", "Last 4Hours", "Today",}; 
+	
+	/**
+	 * Color of line
+	 */
+	public final static int COLOR_LINE = Color.argb(255, 32, 33, 38);
+	
+	/**
+	 * Colors of activities
+	 */
+	public final static int[] COLOR_ACTIVITIES = {
+		
+		Color.argb(255, 114, 141, 108),
+		Color.argb(255, 255, 97, 78),
+		Color.argb(255, 109, 206, 250),
+		Color.argb(255, 244, 141, 62),
+		Color.argb(255, 237, 142, 107),
+		Color.argb(255, 181, 40, 65),
+		Color.argb(255, 181, 204, 122),
+		
+	};
 	
 	
 }

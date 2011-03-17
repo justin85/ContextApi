@@ -1,26 +1,9 @@
 /*
- * Copyright (c) 2009-2010 Chris Smith
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
  */
 
-package uk.co.md87.android.sensorlogger.activities;
+package aus.csiro.justin.sensorlogger.activities;
 
 import android.content.Intent;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -31,11 +14,11 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import aus.csiro.justin.common.ExceptionHandler;
 
 import com.flurry.android.FlurryAgent;
 
-import uk.co.md87.android.common.ExceptionHandler;
-import uk.co.md87.android.sensorlogger.R;
+import aus.csiro.justin.sensorlogger.R;
 
 /**
  *
@@ -48,11 +31,25 @@ public class IntroActivity extends BoundActivity implements OnClickListener {
     public void onCreate(final Bundle icicle) {
         super.onCreate(icicle);
 
-        Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
+        Thread.setDefaultUncaughtExceptionHandler(
+                new ExceptionHandler("SensorLogger",
+                "http://chris.smith.name/android/upload", getVersionName(), getIMEI()));
 
         setContentView(R.layout.intro);
 
         ((Button) findViewById(R.id.introstart)).setOnClickListener(this);
+    }
+
+    public String getVersionName() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (NameNotFoundException ex) {
+            return "Unknown";
+        }
+    }
+
+    public String getIMEI() {
+        return ((TelephonyManager) getSystemService(TELEPHONY_SERVICE)).getDeviceId();
     }
 
     /** {@inheritDoc} */

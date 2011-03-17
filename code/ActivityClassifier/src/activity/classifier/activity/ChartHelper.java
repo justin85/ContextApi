@@ -32,9 +32,13 @@ public class ChartHelper {
 	
 	public static class ChartData {
 		
+		public final int numOfActivities;
+		public final int numOfDurations;
 		public final float[][] percentageMatrix;
 		
 		public ChartData(int numOfActivities) {
+			this.numOfDurations = COL_DURATIONS.length;
+			this.numOfActivities = numOfActivities;
 			this.percentageMatrix = new float[COL_DURATIONS.length][numOfActivities];
 		}
 		
@@ -50,6 +54,9 @@ public class ChartHelper {
 	//	an index of the activities available to the system
 	private Map<String,Integer> activityIndexes;
 	
+	//	map of activity names to nice names
+	private Map<String,String> activityNiceNames;
+	
 	private Context context;
 	private SqlLiteAdapter sqlLiteAdapter;
 	private ActivitiesTable activitiesTable;
@@ -59,6 +66,15 @@ public class ChartHelper {
 	private Classification classification = new Classification();
 	public long[][] sumMatrix;
 	
+	private int col_size;
+	private int row_size;
+	
+	public int getColumnSize(){
+		return col_size;
+	}
+	public int getRowSize(){
+		return row_size;
+	}
 	public ChartHelper(Context context) {
 		this.context = context;
 		this.sqlLiteAdapter = SqlLiteAdapter.getInstance(context);
@@ -66,6 +82,8 @@ public class ChartHelper {
 		this.allActivities = ActivityNames.getAllActivities(context);
 		
 		this.sumMatrix = new long[COL_DURATIONS.length][allActivities.size()];
+		this.col_size = COL_DURATIONS.length;
+		this.row_size = allActivities.size();
 		
 		this.activityIndexes = new TreeMap<String,Integer>(new StringComparator(false));
 		{
@@ -76,8 +94,22 @@ public class ChartHelper {
 			}
 		}
 		
+		this.activityNiceNames = new TreeMap<String,String>(new StringComparator(false));
+		for (String activity:allActivities) {
+			String niceName = Classification.getNiceName(context, activity);
+			this.activityNiceNames.put(activity, niceName);
+		}
+		
 		for (int i=0; i<NUM_OF_DATA_SETS; ++i)
 			dataSets[i] = new ChartData(this.allActivities.size());
+	}
+	
+	public Map<String, Integer> getActivityIndexes(){
+		return activityIndexes;
+	}
+	
+	public Map<String, String> getActivityNiceNames(){
+		return activityNiceNames;
 	}
 	
 	public ChartData computeData()
@@ -86,14 +118,13 @@ public class ChartHelper {
 		
 		long maxDuration = COL_DURATIONS[COL_DURATIONS.length-1];
 		
-		final long periodEnd = periodStart + maxDuration;
+		final long periodEnd = periodStart - maxDuration;
 		
 		for (int i=0; i<COL_DURATIONS.length; ++i) {
 			for (int j=0; j<allActivities.size(); ++j) {
 				sumMatrix[i][j] = 0;
 			}
 		}
-		
 		activitiesTable.loadAllBetween(periodStart, periodEnd, classification,
 				new ActivitiesTable.ClassificationDataCallback() {
 					@Override
@@ -102,20 +133,20 @@ public class ChartHelper {
 							Log.e(Constants.DEBUG_TAG, "ERROR: UNKNOWN ACTIVITY '"+classification.getClassification()+"' FOUND");
 							return;
 						}
-						
 						int index = activityIndexes.get(classification.getClassification());
 						long howLongAgoStarted = periodStart - classification.getStart();
-						
+						long howLongAgoEnded = periodStart- classification.getEnd();
 						for (int i=0; i<COL_DURATIONS.length; ++i) {
 							long colDuration = COL_DURATIONS[i];
-							
+							long activityDuration=0;
 							if (colDuration>=howLongAgoStarted) {
-								long activityDuration = classification.getEnd() - classification.getStart();
-								
-								activityDuration -= periodEnd - classification.getEnd();
-								
-								sumMatrix[i][index] +=  activityDuration;
+								activityDuration = classification.getEnd() - classification.getStart();
+							}else{
+								if(colDuration>=howLongAgoEnded){
+									activityDuration = colDuration - howLongAgoEnded;
+								}
 							}
+							sumMatrix[i][index] +=  activityDuration;
 						}
 					}
 				}
@@ -142,11 +173,11 @@ public class ChartHelper {
 		for (int i=0; i<COL_DURATIONS.length; ++i) {
 			for (int j=0; j<allActivities.size(); ++j) {
 				data.percentageMatrix[i][j] = 100.0f * (float)sumMatrix[i][j] / (float)COL_DURATIONS[i];
+				Log.i("info",sumMatrix[i][j]+"");
 			}
 		}
 		
 		currentLoadData = currentComputeData;
-		
 		return data;
 	}
 	

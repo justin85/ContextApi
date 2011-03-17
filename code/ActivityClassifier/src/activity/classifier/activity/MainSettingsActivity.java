@@ -20,6 +20,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -28,8 +29,11 @@ import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceCategory;
 import android.preference.PreferenceScreen;
+import android.util.AttributeSet;
 import android.util.Log;
+import android.view.View;
 import android.widget.CheckBox;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.flurry.android.FlurryAgent;
@@ -239,13 +243,14 @@ public class MainSettingsActivity extends PreferenceActivity {
 		});
 		dialogBasedPrefCat.addPreference(resetPref);
 
-
-		caliPref.setKey("cali_preference");
-		caliPref.setTitle("Current Calibration Values");
+		CheckBoxPreferenceWithLongSummary testing =  new CheckBoxPreferenceWithLongSummary(this);
+		testing.setKey("cali_preference");
+		testing.setTitle("Current Calibration Values");
 		setScreenSummary();
-		caliPref.setSummary(getScreenSummary());
-		caliPref.setSelectable(false);
-		dialogBasedPrefCat.addPreference(caliPref);
+		testing.setSummary(getScreenSummary());
+		testing.setSelectable(false);
+		
+		dialogBasedPrefCat.addPreference(testing);
 
 		PreferenceCategory filePrefCat = new PreferenceCategory(this);
 		filePrefCat.setTitle("Data settings");
@@ -383,12 +388,15 @@ public class MainSettingsActivity extends PreferenceActivity {
 	
 	private void setScreenSummary(){
 		float[] sd = optionsTable.getSd();
+		float[] offSet = optionsTable.getOffset();
 		screenSummary =
-		"Gravity Value               : "+optionsTable.getValueOfGravity()+"\n" +
 		"Standard Deviation X : "+sd[Constants.ACCEL_X_AXIS]+"\n" +
 		"Standard Deviation Y : "+sd[Constants.ACCEL_Y_AXIS]+"\n" +
-		"Standard Deviation Z : "+sd[Constants.ACCEL_Z_AXIS]+"\n";
-	}
+		"Standard Deviation Z : "+sd[Constants.ACCEL_Z_AXIS]+"\n" +
+		"Offset X                       : "+offSet[Constants.ACCEL_X_AXIS]+"\n" +
+		"Offset Y                       : "+offSet[Constants.ACCEL_Y_AXIS]+"\n" +
+		"Offset Z                       : "+offSet[Constants.ACCEL_Z_AXIS]+"\n";
+	} 
 	
 	private String getScreenSummary(){
 		return this.screenSummary;
@@ -414,4 +422,27 @@ public class MainSettingsActivity extends PreferenceActivity {
 			Log.e(Constants.DEBUG_TAG, "Copy database to SD Card Error", e);
 		}
 	}
+	public class CheckBoxPreferenceWithLongSummary extends CheckBoxPreference{
+
+	    public CheckBoxPreferenceWithLongSummary(Context context) {
+	        super(context);
+	    }
+
+	    public CheckBoxPreferenceWithLongSummary(Context context, AttributeSet attrs) {
+	        super(context, attrs);
+	    }
+	    public CheckBoxPreferenceWithLongSummary(Context context, AttributeSet attrs, int defStyle) {
+	        super(context, attrs, defStyle);
+	    }
+
+	    @Override
+	    protected void onBindView(View view) {
+	        super.onBindView(view);
+	        TextView summaryView = (TextView) view.findViewById(android.R.id.summary);
+	        summaryView.setMaxLines(10);
+	        CheckBox checkBox = (CheckBox) view.findViewById(android.R.id.checkbox);
+	        checkBox.setVisibility(view.GONE);
+	    }
+	}
+
 }

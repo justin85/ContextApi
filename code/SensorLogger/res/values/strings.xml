@@ -5,20 +5,15 @@
     <string name="introheader">Introduction</string>
     <string name="intro1">
         This application records any changes in your phone\'s accelerometer and
-        magnetic field sensors over a period of 50 seconds. The purpose is to
-        automatically determine what activity you are performing (such as
-        walking, standing or sitting).
+        magnetic field sensors. 
     </string>
     <string name="intro2">
-        Once 1,000 entries have been recorded (around 50 seconds), the data
-        will be analysed to try and determine your activity. You can then say
-        whether or not this is correct, and submit the data and the verdict
-        to a website in order to help improve the software in the future.
+       
     </string>
     <string name="intro3">
         When you click Begin there will be a 10 second delay to allow you
         to put the phone in your pocket or usual carrying place. After that,
-        data will be recorded for approximately 50 seconds. You\'ll hear a
+        data will be recorded until you click the Stop button. You\'ll hear a
         beep when it\'s done.
     </string>
     <string name="continuebutton">Begin</string>
@@ -32,7 +27,7 @@
     <string name="recordingheader">Recording...</string>
     <string name="analysingheader">Analysing...</string>
     <string name="recordinginitial"></string>
-    <string name="recordingwait">Please wait</string>
+    <string name="recordingwait">Click stop button when you want to finish to record</string>
 
     <string name="resultsheader">Results</string>
     <string name="resultsblurb">Based on the data collected, it would appear
@@ -49,7 +44,7 @@
 
     <string name="yesbutton">Yes</string>
     <string name="nobutton">No</string>
-
+ 	<string name="stop">Stop</string>
     <string name="correct_activity">What activity were you actually performing?</string>
     <string name="correct_title">Enter correction</string>
     <string name="correct_button">Submit</string>

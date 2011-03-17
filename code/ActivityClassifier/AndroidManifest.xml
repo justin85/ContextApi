@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest package="activity.classifier" android:versionCode="1" android:versionName="1" xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:icon="@drawable/icon" android:debuggable="true" android:label="Activity Classifier">
+    <application android:debuggable="true" android:label="Activity Classifier" android:icon="@drawable/avocado2icons72">
          <activity android:screenOrientation="portrait" android:label="Activity Classifier" android:name=".activity.MainTabActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
